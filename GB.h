@@ -6,6 +6,8 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
+#include "GBOpcodes.h"
+
 #define GB_VID_WIDTH 160
 #define GB_VID_HEIGHT 144
 
@@ -31,14 +33,7 @@ typedef struct RenderContextstruct
     int pitch;
 } RenderContext;
 
-// Info from https://realboyemulator.files.wordpress.com/2013/01/gbcpuman.pdf
-// Power Up Sequence (Found on Page 18)
-// BC = $0013
-// DE = $00D8
-// HL = $014D
-// Stack Pointer = $FFFE
 // CPU Opcode information (Found on Page 65)
-
 // Memory Info (Found on Page 8)
 // RAM: 8K = uint8_t[0x8000]
 
@@ -65,6 +60,10 @@ typedef struct GBstruct
 
     // Main Memory
     uint8_t mem[0x8000];
+
+    // Cartridge Memory
+    uint8_t *cart;
+    uint32_t cartSize;
 } GB;
 
 void DestroyGBRenderContext(RenderContext *ctx)
@@ -101,6 +100,11 @@ void DestroyGB(GB *gb)
     {
         DestroyGBRenderContext(gb->ctx);
         gb->ctx = NULL;
+
+        if (gb->cart != NULL)
+        {
+            free(gb->cart);
+        }
 
         free(gb);
     }
@@ -176,8 +180,41 @@ uint8_t ReadMem(GB *gb, uint16_t addr)
     {
         return gb->mem[addr - 0x8000];
     }
+    else
+    {
+        return gb->cart[addr];
+    }
 
     return 0;
+}
+
+void WriteMem(GB *gb, uint16_t addr, uint8_t val)
+{
+    if (addr >= 0x8000)
+    {
+        gb->mem[addr - 0x8000] = val;
+    }
+}
+
+uint8_t *LoadRom(const char *filename, uint32_t *romSize)
+{
+    FILE *f = fopen(filename, "rb");
+    if (f == NULL)
+    {
+        return NULL;
+    }
+
+    fseek(f, 0, SEEK_END);
+    (*romSize) = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    uint8_t *rom = malloc(sizeof(uint8_t) * (*romSize));
+
+    fread(rom, (*romSize), 1, f);
+
+    fclose(f);
+
+    return rom;
 }
 
 void SimpleRender(GB *gb, RenderContext *ctx)
@@ -254,6 +291,35 @@ void SimpleRender(GB *gb, RenderContext *ctx)
     SDL_RenderPresent(ctx->renderer);
 }
 
+uint8_t FetchByte(GB *gb)
+{
+    gb->PC += 1;
+    return ReadMem(gb, gb->PC - 1);
+}
+
+bool DoInstruction(GB *gb)
+{
+    // Fetch opcode
+    uint8_t opcode = FetchByte(gb);
+
+    switch (opcode)
+    {
+    case OP_NOP:
+        break;
+
+    // Jump Commands
+    case OP_JP_NN:
+        gb->PC = FetchByte(gb) | (FetchByte(gb) << 8);
+        break;
+
+    default:
+        printf("Unknown instruction: 0x%hhX\n", opcode);
+        return false;
+    }
+
+    return true;
+}
+
 void StartGB(GB *gb)
 {
     if (gb == NULL)
@@ -263,29 +329,51 @@ void StartGB(GB *gb)
 
     printf("GB Starting...\n");
 
+    gb->cart = LoadRom("tests/carts/cpu_instrs/individual/01-special.gb", &gb->cartSize);
+    if (gb->cart == NULL)
+    {
+        return;
+    }
+
+    // Info from https://realboyemulator.files.wordpress.com/2013/01/gbcpuman.pdf
+    // Power Up Sequence (Found on Page 18)
+    // BC = $0013
+    // DE = $00D8
+    // HL = $014D
+    // Stack Pointer = $FFFE
+
+    gb->B = 0x00;
+    gb->C = 0x13;
+    gb->D = 0x00;
+    gb->E = 0xD8;
+    gb->H = 0x01;
+    gb->L = 0x4D;
+
+    gb->SP = 0xFFFE;
+
+    // TODO: Run boot up procedure instead of jumping to cartridge immediately
+    gb->PC = 0x0100;
+
     // memset(gb->mem, 0, sizeof(uint8_t) * 0x8000);
 
-    gb->mem[0x1800] = 0;
-    gb->mem[0x1801] = 1;
+    // gb->mem[0x1800] = 0;
 
-    gb->mem[0] = 0x7C;
-    gb->mem[1] = 0x7C;
-    gb->mem[2] = 0x00;
-    gb->mem[3] = 0xC6;
-    gb->mem[4] = 0xC6;
-    gb->mem[5] = 0x00;
-    gb->mem[6] = 0x00;
-    gb->mem[7] = 0xFE;
-    gb->mem[8] = 0xC6;
-    gb->mem[9] = 0xC6;
-    gb->mem[0xa] = 0x00;
-    gb->mem[0xb] = 0xC6;
-    gb->mem[0xc] = 0xC6;
-    gb->mem[0xd] = 0x00;
-    gb->mem[0xe] = 0x00;
-    gb->mem[0xf] = 0x00;
-
-    SimpleRender(gb, gb->ctx);
+    // gb->mem[0] = 0x7C;
+    // gb->mem[1] = 0x7C;
+    // gb->mem[2] = 0x00;
+    // gb->mem[3] = 0xC6;
+    // gb->mem[4] = 0xC6;
+    // gb->mem[5] = 0x00;
+    // gb->mem[6] = 0x00;
+    // gb->mem[7] = 0xFE;
+    // gb->mem[8] = 0xC6;
+    // gb->mem[9] = 0xC6;
+    // gb->mem[0xa] = 0x00;
+    // gb->mem[0xb] = 0xC6;
+    // gb->mem[0xc] = 0xC6;
+    // gb->mem[0xd] = 0x00;
+    // gb->mem[0xe] = 0x00;
+    // gb->mem[0xf] = 0x00;
 
     bool running = true;
     while (running)
@@ -298,5 +386,9 @@ void StartGB(GB *gb)
                 running = false;
             }
         }
+
+        running = DoInstruction(gb);
+
+        SimpleRender(gb, gb->ctx);
     }
 }
