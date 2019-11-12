@@ -9,7 +9,7 @@
 
 #include "GBOpcodes.h"
 
-#define _DBG_INSTR_
+// #define _DBG_INSTR_
 
 #define GB_VID_WIDTH 160
 #define GB_VID_HEIGHT 144
@@ -245,7 +245,7 @@ void DumpCPURegisters(GB *gb)
 void DumpRomInfo(GB *gb)
 {
     printf("Rom Info\n");
-    printf("\tTitle: %s\n", gb->cart[CART_TITLE]);
+    printf("\tTitle: %s\n", &gb->cart[CART_TITLE]);
     printf("\tCart Type: 0x%01X\n", gb->cart[CART_CART_TYPE]);
     printf("\tROM Size: 0x%01X\n", gb->cart[CART_ROMSIZE]);
     printf("\tRAM Size: 0x%01X\n", gb->cart[CART_RAMSIZE]);
@@ -404,6 +404,9 @@ char *GetRegName(uint8_t reg)
 
     case REG_HL:
         return "HL";
+
+    case REG_SP:
+        return "SP";
 
     case REG_AF:
         return "A(F)";
@@ -573,6 +576,16 @@ bool DoInstruction(GB *gb)
     }
     break;
 
+    case OP_LD_IOn_A:
+    {
+        // TODO: write to io port
+        uint8_t offset = FetchByte(gb);
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LD (FF00+$%01X),A - NOT IMPLEMENTED!\n", gb->regs[REG_PC] - 1, offset);
+#endif
+    }
+    break;
+
     case OP_LDI_A_ptrHL:
     {
 
@@ -587,7 +600,36 @@ bool DoInstruction(GB *gb)
     }
     break;
 
+    case OP_LD_ptrnn_A:
+    {
+        uint16_t addr = FetchWord(gb);
+
+        WriteMem(gb, addr, Get8Reg(gb, REG_A));
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LD ($%02X),A\n", gb->regs[REG_PC] - 1, addr);
+#endif
+    }
+    break;
+
     // 8bit Arthmetic/logical Commands
+    case OP_AND_B:
+    case OP_AND_C:
+    case OP_AND_D:
+    case OP_AND_E:
+    case OP_AND_H:
+    case OP_AND_L:
+    case OP_AND_A:
+    {
+        uint8_t reg = opcode & 0b111;
+        Set8Reg(gb, REG_A, Get8Reg(gb, reg));
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, AND %s\n", gb->regs[REG_PC] - 1, Get8Reg(gb, reg));
+#endif
+    }
+    break;
+
     case OP_INC_B:
     case OP_INC_C:
     case OP_INC_D:
@@ -667,6 +709,16 @@ bool DoInstruction(GB *gb)
     }
     break;
 
+    // CPU Control Commands
+    case OP_DI:
+    {
+        // TODO: disable interrupts
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, DI - NOT IMPLEMENTED!\n", gb->regs[REG_PC] - 1);
+#endif
+    }
+    break;
+
     // Jump Commands
     case OP_JP_NN:
     {
@@ -709,6 +761,51 @@ bool DoInstruction(GB *gb)
     }
     break;
 
+    case OP_JR_dd:
+    {
+        uint8_t offset = FetchByte(gb);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, JR PC+$%01X\n", gb->regs[REG_PC] - 1, (uint8_t)offset);
+#endif
+        if ((offset & 0x80) > 0)
+        {
+            offset = ~offset;
+            offset += 1;
+
+            gb->regs[REG_PC] -= offset;
+        }
+        else
+        {
+            gb->regs[REG_PC] += offset;
+        }
+    }
+    break;
+
+    case OP_CALL_nn:
+    {
+        uint16_t addr = FetchWord(gb);
+        gb->regs[REG_SP] -= 2;
+        WriteMem(gb, gb->regs[REG_SP], gb->regs[REG_PC]);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, CALL $%02X\n", gb->regs[REG_PC] - 1, addr);
+#endif
+        gb->regs[REG_PC] = addr;
+    }
+    break;
+
+    case OP_RET:
+    {
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, RET\n", gb->regs[REG_PC] - 1);
+#endif
+
+        gb->regs[REG_PC] = ReadMem(gb, gb->regs[REG_SP]);
+        gb->regs[REG_SP] += 2;
+    }
+    break;
+
     default:
     {
         DumpCPURegisters(gb);
@@ -729,7 +826,7 @@ void StartGB(GB *gb)
 
     printf("GB Starting...\n");
 
-    gb->cart = LoadRom("tests/carts/cpu_instrs/individual/06-ld r,r.gb", &gb->cartSize);
+    gb->cart = LoadRom("tests/carts/Tetris (JUE) (V1.1) [!].gb", &gb->cartSize);
     if (gb->cart == NULL)
     {
         return;
@@ -794,5 +891,6 @@ void StartGB(GB *gb)
         SimpleRender(gb, gb->ctx);
     }
 
-    DumpCPURegisters(gb);
+    SimpleRender(gb, gb->ctx);
+    // DumpCPURegisters(gb);
 }

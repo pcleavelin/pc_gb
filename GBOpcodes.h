@@ -79,7 +79,7 @@
 #define OP_LD_A_H (REG_A << 3 | REG_H | 0x40)
 #define OP_LD_A_L (REG_A << 3 | REG_L | 0x40)
 #define OP_LD_A_A (REG_A << 3 | REG_A | 0x40)
-//ld r,n
+// ld r,n
 #define OP_LD_B_n (REG_B << 3 | 6)
 #define OP_LD_C_n (REG_C << 3 | 6)
 #define OP_LD_D_n (REG_D << 3 | 6)
@@ -88,13 +88,16 @@
 #define OP_LD_L_n (REG_L << 3 | 6)
 #define OP_LD_A_n (REG_A << 3 | 6)
 
-//ld [DE], A
+// ld (DE), A
 #define OP_LD_ptrDE_A 0x12
 
-//ldi A, [HL]
+// ld (FF00+n),A
+#define OP_LD_IOn_A 0xE0
+
+// ldi A, (HL)
 #define OP_LDI_A_ptrHL 0x2A
 
-//ld r,[HL]
+// ld r,(HL)
 #define OP_LD_B_ptrHL 0x46
 #define OP_LD_C_ptrHL 0x4E
 #define OP_LD_D_ptrHL 0x56
@@ -103,7 +106,19 @@
 #define OP_LD_L_ptrHL 0x6E
 #define OP_LD_A_ptrHL 0x7E
 
+// ld (nn), A
+#define OP_LD_ptrnn_A 0xEA
+
 // 8bit Arthmetic/logical Commands
+// and r
+#define OP_AND_B (0xA0 | REG_B)
+#define OP_AND_C (0xA0 | REG_C)
+#define OP_AND_D (0xA0 | REG_D)
+#define OP_AND_E (0xA0 | REG_E)
+#define OP_AND_H (0xA0 | REG_H)
+#define OP_AND_L (0xA0 | REG_L)
+#define OP_AND_A (0xA0 | REG_A)
+
 // inc r
 #define OP_INC_B (REG_B << 3 | 4)
 #define OP_INC_C (REG_C << 3 | 4)
@@ -131,6 +146,9 @@
 // ld SP, HL
 #define OP_LD_SP_HL 0xF9
 
+// CPU Control Commands
+#define OP_DI 0xF3
+
 // Jump Commands
 // jp nn
 #define OP_JP_NN 0xC3
@@ -143,3 +161,6 @@
 #define OP_JR_Z_dd (FLAG_Z << 3 | 0x20)
 #define OP_JR_NC_dd (FLAG_NC << 3 | 0x20)
 #define OP_JR_C_dd (FLAG_C << 3 | 0x20)
+#define OP_JR_dd 0x18
+#define OP_CALL_nn 0xCD
+#define OP_RET 0xC9
