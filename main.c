@@ -16,4 +16,6 @@ int main(int argc, char **argv)
 
     DestroyGB(gb);
     gb = NULL;
+
+    return 0;
 }

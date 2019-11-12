@@ -13,6 +13,12 @@
 
 #define RENDER_SCALE 4
 
+#define REG_BC 0x00
+#define REG_DE 0x01
+#define REG_HL 0x02
+#define REG_SP 0x03
+#define REG_PC 0x04
+
 // 0xFF40 - LCD Control Register
 // Bit 7 - LCD Power           (0=Off, 1=On)
 // Bit 6 - Window Tile Map     (0=9800h-9BFFh, 1=9C00h-9FFFh)
@@ -43,9 +49,10 @@ typedef struct GBstruct
 
     // Info From http://problemkaputt.de/pandocs.htm#cpuregistersandflags
 
-    // Hi & Lo Registers respectively
-    uint8_t A, B, D, H;
-    uint8_t F, C, E, L;
+    // BC[0], DE[1], HL[2], SP[3], PC[4]
+    // Stored as an array for easier instruction handling
+    uint16_t regs[5];
+    uint8_t A, F;
 
     // Flags
     // Bit 7 - Zero
@@ -53,10 +60,6 @@ typedef struct GBstruct
     // Bit 5 - Half Carry Flag (BCD)
     // Bit 4 - Carry
     // Bit 3->0 - Unused (always zero)
-
-    // Stack Pointer & Program Counter
-    uint16_t SP;
-    uint16_t PC;
 
     // Main Memory
     uint8_t mem[0x8000];
@@ -217,6 +220,17 @@ uint8_t *LoadRom(const char *filename, uint32_t *romSize)
     return rom;
 }
 
+void DumpCPURegisters(GB *gb)
+{
+    printf("CPU Registers\n");
+    printf("\tA: 0x%01x\n", gb->A);
+    printf("\tBC: 0x%02x\n", gb->regs[REG_BC]);
+    printf("\tDE: 0x%02x\n", gb->regs[REG_DE]);
+    printf("\tHL: 0x%02x\n", gb->regs[REG_HL]);
+    printf("\tSP: 0x%02x\n", gb->regs[REG_SP]);
+    printf("PC: 0x%02x\n", gb->regs[REG_PC]);
+}
+
 void SimpleRender(GB *gb, RenderContext *ctx)
 {
     SDL_LockTexture(
@@ -293,8 +307,13 @@ void SimpleRender(GB *gb, RenderContext *ctx)
 
 uint8_t FetchByte(GB *gb)
 {
-    gb->PC += 1;
-    return ReadMem(gb, gb->PC - 1);
+    gb->regs[REG_PC] += 1;
+    return ReadMem(gb, gb->regs[REG_PC] - 1);
+}
+
+uint16_t FetchWord(GB *gb)
+{
+    return FetchByte(gb) | (FetchByte(gb) << 8);
 }
 
 bool DoInstruction(GB *gb)
@@ -305,16 +324,112 @@ bool DoInstruction(GB *gb)
     switch (opcode)
     {
     case OP_NOP:
-        break;
+    {
+    }
+    break;
+
+    // 8bit Load Commands
+    case OP_LD_B_B:
+    case OP_LD_B_C:
+    case OP_LD_B_D:
+    case OP_LD_B_E:
+    case OP_LD_B_H:
+    case OP_LD_B_L:
+    case OP_LD_B_A:
+    case OP_LD_C_B:
+    case OP_LD_C_C:
+    case OP_LD_C_D:
+    case OP_LD_C_E:
+    case OP_LD_C_H:
+    case OP_LD_C_L:
+    case OP_LD_C_A:
+    case OP_LD_D_B:
+    case OP_LD_D_C:
+    case OP_LD_D_D:
+    case OP_LD_D_E:
+    case OP_LD_D_H:
+    case OP_LD_D_L:
+    case OP_LD_D_A:
+    case OP_LD_E_B:
+    case OP_LD_E_C:
+    case OP_LD_E_D:
+    case OP_LD_E_E:
+    case OP_LD_E_H:
+    case OP_LD_E_L:
+    case OP_LD_E_A:
+    case OP_LD_H_B:
+    case OP_LD_H_C:
+    case OP_LD_H_D:
+    case OP_LD_H_E:
+    case OP_LD_H_H:
+    case OP_LD_H_L:
+    case OP_LD_H_A:
+    case OP_LD_L_B:
+    case OP_LD_L_C:
+    case OP_LD_L_D:
+    case OP_LD_L_E:
+    case OP_LD_L_H:
+    case OP_LD_L_L:
+    case OP_LD_L_A:
+    case OP_LD_A_B:
+    case OP_LD_A_C:
+    case OP_LD_A_D:
+    case OP_LD_A_E:
+    case OP_LD_A_H:
+    case OP_LD_A_L:
+    case OP_LD_A_A:
+    {
+        uint8_t regDst = (opcode >> 3) & 0b111;
+        uint8_t regSrc = opcode & 0b111;
+
+        if (regDst == 7)
+        {
+            // If both src and dst are A do nothing
+            if (regSrc != 7)
+            {
+                gb->A = gb->regs[regSrc];
+            }
+        }
+        else
+        {
+            if (regSrc == 7)
+            {
+                gb->regs[regDst] = gb->A;
+            }
+            else
+            {
+                gb->regs[regDst] = gb->regs[regSrc];
+            }
+        }
+    }
+    break;
+
+    // 16bit Load Commands
+    case OP_LD_BC_NN:
+    case OP_LD_DE_NN:
+    case OP_LD_HL_NN:
+    case OP_LD_SP_NN:
+    {
+        uint8_t reg = (opcode & 0xF0) >> 8;
+        uint16_t val = FetchWord(gb);
+
+        gb->regs[reg] = val;
+    }
+    break;
 
     // Jump Commands
     case OP_JP_NN:
-        gb->PC = FetchByte(gb) | (FetchByte(gb) << 8);
-        break;
+    {
+        gb->regs[REG_PC] = FetchWord(gb);
+    }
+    break;
 
     default:
-        printf("Unknown instruction: 0x%hhX\n", opcode);
+    {
+        DumpCPURegisters(gb);
+        printf("Unknown instruction: 0x%01X\n", opcode);
         return false;
+    }
     }
 
     return true;
@@ -342,17 +457,13 @@ void StartGB(GB *gb)
     // HL = $014D
     // Stack Pointer = $FFFE
 
-    gb->B = 0x00;
-    gb->C = 0x13;
-    gb->D = 0x00;
-    gb->E = 0xD8;
-    gb->H = 0x01;
-    gb->L = 0x4D;
-
-    gb->SP = 0xFFFE;
+    gb->regs[REG_BC] = 0x0013;
+    gb->regs[REG_DE] = 0x00D8;
+    gb->regs[REG_HL] = 0x014D;
+    gb->regs[REG_SP] = 0xFFFE;
 
     // TODO: Run boot up procedure instead of jumping to cartridge immediately
-    gb->PC = 0x0100;
+    gb->regs[REG_PC] = 0x0100;
 
     // memset(gb->mem, 0, sizeof(uint8_t) * 0x8000);
 
