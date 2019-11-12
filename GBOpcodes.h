@@ -15,6 +15,11 @@
 #define REG_L 0x5
 #define REG_A 0x7
 
+#define FLAG_NZ 0x0
+#define FLAG_Z 0x1
+#define FLAG_NC 0x2
+#define FLAG_C 0x3
+
 #define OP_NOP 0x00
 
 // 8bit Load Commands
@@ -75,13 +80,19 @@
 #define OP_LD_A_L (REG_A << 3 | REG_L | 0x40)
 #define OP_LD_A_A (REG_A << 3 | REG_A | 0x40)
 //ld r,n
-#define OP_LD_B_nn (REG_B << 3 | 6)
-#define OP_LD_C_nn (REG_C << 3 | 6)
-#define OP_LD_D_nn (REG_D << 3 | 6)
-#define OP_LD_E_nn (REG_E << 3 | 6)
-#define OP_LD_H_nn (REG_H << 3 | 6)
-#define OP_LD_L_nn (REG_L << 3 | 6)
-#define OP_LD_A_nn (REG_A << 3 | 6)
+#define OP_LD_B_n (REG_B << 3 | 6)
+#define OP_LD_C_n (REG_C << 3 | 6)
+#define OP_LD_D_n (REG_D << 3 | 6)
+#define OP_LD_E_n (REG_E << 3 | 6)
+#define OP_LD_H_n (REG_H << 3 | 6)
+#define OP_LD_L_n (REG_L << 3 | 6)
+#define OP_LD_A_n (REG_A << 3 | 6)
+
+//ld [DE], A
+#define OP_LD_ptrDE_A 0x12
+
+//ldi A, [HL]
+#define OP_LDI_A_ptrHL 0x2A
 
 //ld r,[HL]
 #define OP_LD_B_ptrHL 0x46
@@ -91,6 +102,25 @@
 #define OP_LD_H_ptrHL 0x66
 #define OP_LD_L_ptrHL 0x6E
 #define OP_LD_A_ptrHL 0x7E
+
+// 8bit Arthmetic/logical Commands
+// inc r
+#define OP_INC_B (REG_B << 3 | 4)
+#define OP_INC_C (REG_C << 3 | 4)
+#define OP_INC_D (REG_D << 3 | 4)
+#define OP_INC_E (REG_E << 3 | 4)
+#define OP_INC_H (REG_H << 3 | 4)
+#define OP_INC_L (REG_L << 3 | 4)
+#define OP_INC_A (REG_A << 3 | 4)
+
+// dec r
+#define OP_DEC_B (REG_B << 3 | 5)
+#define OP_DEC_C (REG_C << 3 | 5)
+#define OP_DEC_D (REG_D << 3 | 5)
+#define OP_DEC_E (REG_E << 3 | 5)
+#define OP_DEC_H (REG_H << 3 | 5)
+#define OP_DEC_L (REG_L << 3 | 5)
+#define OP_DEC_A (REG_A << 3 | 5)
 
 // 16bit Load Commands
 // ld rr,nn
@@ -102,5 +132,14 @@
 #define OP_LD_SP_HL 0xF9
 
 // Jump Commands
+// jp nn
 #define OP_JP_NN 0xC3
+
+// jp HL
 #define OP_JP_HL 0xE9
+
+// jr f,PC+dd
+#define OP_JR_NZ_dd (FLAG_NZ << 3 | 0x20)
+#define OP_JR_Z_dd (FLAG_Z << 3 | 0x20)
+#define OP_JR_NC_dd (FLAG_NC << 3 | 0x20)
+#define OP_JR_C_dd (FLAG_C << 3 | 0x20)

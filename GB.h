@@ -4,14 +4,32 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <memory.h>
 #include <SDL2/SDL.h>
 
 #include "GBOpcodes.h"
+
+#define _DBG_INSTR_
 
 #define GB_VID_WIDTH 160
 #define GB_VID_HEIGHT 144
 
 #define RENDER_SCALE 4
+
+#define CART_ENTRYPOINT 0x100
+#define CART_LOGO 0x104
+#define CART_LOGO_END 0x133
+#define CART_TITLE 0x134
+#define CART_TITLE_END 0x143
+#define CART_CART_TYPE 0x147
+#define CART_ROMSIZE 0x148
+#define CART_RAMSIZE 0x149
+#define CART_DEST_CODE 0x14A
+#define CART_OLD_LICENSEE_CODE 0x14B
+#define CART_MASK_ROM_VERSION 0x14C
+#define CART_HEADER_CHECKSUM 0x14D
+#define CART_GLOBAL_CHECKSUM 0x14E
+#define CART_GLOBAL_CHECKSUM_END 0x14F
 
 // 0xFF40 - LCD Control Register
 // Bit 7 - LCD Power           (0=Off, 1=On)
@@ -221,7 +239,16 @@ void DumpCPURegisters(GB *gb)
     printf("\tDE: 0x%02x\n", gb->regs[REG_DE]);
     printf("\tHL: 0x%02x\n", gb->regs[REG_HL]);
     printf("\tSP: 0x%02x\n", gb->regs[REG_SP]);
-    printf("PC: 0x%02x\n", gb->regs[REG_PC]);
+    printf("PC: 0x%02x\n", gb->regs[REG_PC] - 1);
+}
+
+void DumpRomInfo(GB *gb)
+{
+    printf("Rom Info\n");
+    printf("\tTitle: %s\n", gb->cart[CART_TITLE]);
+    printf("\tCart Type: 0x%01X\n", gb->cart[CART_CART_TYPE]);
+    printf("\tROM Size: 0x%01X\n", gb->cart[CART_ROMSIZE]);
+    printf("\tRAM Size: 0x%01X\n", gb->cart[CART_RAMSIZE]);
 }
 
 void SimpleRender(GB *gb, RenderContext *ctx)
@@ -311,16 +338,17 @@ uint16_t FetchWord(GB *gb)
 
 void Set8Reg(GB *gb, uint8_t reg, uint8_t val)
 {
+    size_t index = reg == REG_A ? 7 : reg / 2;
     uint16_t bigVal = val;
     uint16_t mask = 0xFF00;
-    if (reg % 2 == 0)
+    if (reg % 2 == 0 || reg == REG_A)
     {
         bigVal <<= 8;
         mask >>= 8;
     }
 
-    gb->regs[reg / 2] &= mask;
-    gb->regs[reg / 2] |= bigVal;
+    gb->regs[index] &= mask;
+    gb->regs[index] |= bigVal;
 }
 
 uint8_t Get8Reg(GB *gb, uint8_t reg)
@@ -333,6 +361,111 @@ uint8_t Get8Reg(GB *gb, uint8_t reg)
     }
 
     return val & 0xFF;
+}
+
+char *GetReg8Name(uint8_t reg)
+{
+    switch (reg)
+    {
+    case REG_B:
+        return "B";
+
+    case REG_C:
+        return "C";
+
+    case REG_D:
+        return "D";
+
+    case REG_E:
+        return "E";
+
+    case REG_H:
+        return "H";
+
+    case REG_L:
+        return "L";
+
+    case REG_A:
+        return "A";
+    default:
+        return "??";
+    }
+}
+
+char *GetRegName(uint8_t reg)
+{
+    switch (reg)
+    {
+    case REG_BC:
+        return "BC";
+
+    case REG_DE:
+        return "DE";
+
+    case REG_HL:
+        return "HL";
+
+    case REG_AF:
+        return "A(F)";
+
+    default:
+        return "??";
+    }
+}
+
+char *GetFlagName(uint8_t flag)
+{
+    switch (flag)
+    {
+    case FLAG_NZ:
+        return "NZ";
+
+    case FLAG_Z:
+        return "Z";
+
+    case FLAG_NC:
+        return "NC";
+
+    case FLAG_C:
+        return "C";
+
+    default:
+        return "??";
+    }
+}
+
+bool CheckFlag(GB *gb, uint8_t flag)
+{
+    switch (flag)
+    {
+    case FLAG_NZ:
+    {
+        return (gb->regs[REG_AF] & 0x8) == 0;
+    }
+    break;
+
+    case FLAG_Z:
+    {
+        return (gb->regs[REG_AF] & 0x8) > 0;
+    }
+    break;
+
+    case FLAG_NC:
+    {
+        return (gb->regs[REG_AF] & 0x10) == 0;
+    }
+    break;
+
+    case FLAG_C:
+    {
+        return (gb->regs[REG_AF] & 0x10) >= 0;
+    }
+    break;
+
+    default:
+        printf("Checking flag that doesn't not exist. This should not have been called!\n");
+        return false;
+    }
 }
 
 bool DoInstruction(GB *gb)
@@ -398,10 +531,121 @@ bool DoInstruction(GB *gb)
     case OP_LD_A_L:
     case OP_LD_A_A:
     {
+
         uint8_t regDst = (opcode >> 3) & 0b111;
         uint8_t regSrc = opcode & 0b111;
 
         Set8Reg(gb, regDst, Get8Reg(gb, regSrc));
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LD %s,%s\n", gb->regs[REG_PC] - 1, GetReg8Name(regDst), GetReg8Name(regSrc));
+#endif
+    }
+    break;
+
+    case OP_LD_B_n:
+    case OP_LD_C_n:
+    case OP_LD_D_n:
+    case OP_LD_E_n:
+    case OP_LD_H_n:
+    case OP_LD_L_n:
+    case OP_LD_A_n:
+    {
+
+        uint8_t regDst = (opcode >> 3) & 0b111;
+        uint8_t val = FetchByte(gb);
+
+        Set8Reg(gb, regDst, val);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LD %s,$%01X\n", gb->regs[REG_PC] - 1, GetReg8Name(regDst), val);
+#endif
+    }
+    break;
+
+    case OP_LD_ptrDE_A:
+    {
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LD ($%02X),A - (DE)\n", gb->regs[REG_PC] - 1, gb->regs[REG_DE]);
+#endif
+
+        WriteMem(gb, gb->regs[REG_DE], Get8Reg(gb, REG_A));
+    }
+    break;
+
+    case OP_LDI_A_ptrHL:
+    {
+
+        uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
+        gb->regs[REG_HL] += 1;
+
+        Set8Reg(gb, REG_A, val);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LDI A,($%02X) - (HL)\n", gb->regs[REG_PC] - 1, gb->regs[REG_HL]);
+#endif
+    }
+    break;
+
+    // 8bit Arthmetic/logical Commands
+    case OP_INC_B:
+    case OP_INC_C:
+    case OP_INC_D:
+    case OP_INC_E:
+    case OP_INC_H:
+    case OP_INC_L:
+    case OP_INC_A:
+    {
+
+        uint8_t reg = (opcode >> 3) & 0b111;
+        uint8_t val = Get8Reg(gb, reg) + 1;
+
+        Set8Reg(gb, reg, val);
+
+        if (val == 0)
+        {
+            gb->regs[REG_AF] |= 0x8;
+        }
+        else
+        {
+            gb->regs[REG_AF] &= ~0x8;
+        }
+        gb->regs[REG_AF] &= ~0x4;
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, INC %s\n", gb->regs[REG_PC] - 1, GetReg8Name(reg));
+#endif
+    }
+    break;
+
+    case OP_DEC_B:
+    case OP_DEC_C:
+    case OP_DEC_D:
+    case OP_DEC_E:
+    case OP_DEC_H:
+    case OP_DEC_L:
+    case OP_DEC_A:
+    {
+
+        uint8_t reg = (opcode >> 3) & 0b111;
+        uint8_t val = Get8Reg(gb, reg) - 1;
+
+        Set8Reg(gb, reg, val);
+
+        if (val == 0)
+        {
+            gb->regs[REG_AF] |= 0x8;
+        }
+        else
+        {
+            gb->regs[REG_AF] &= ~0x8;
+        }
+
+        gb->regs[REG_AF] |= 0x4;
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, DEC %s\n", gb->regs[REG_PC] - 1, GetReg8Name(reg));
+#endif
     }
     break;
 
@@ -411,17 +655,57 @@ bool DoInstruction(GB *gb)
     case OP_LD_HL_NN:
     case OP_LD_SP_NN:
     {
-        uint8_t reg = (opcode & 0xF0) >> 8;
+
+        uint8_t reg = (opcode & 0xF0) >> 4;
         uint16_t val = FetchWord(gb);
 
         gb->regs[reg] = val;
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LD %s,$%02X\n", gb->regs[REG_PC] - 1, GetRegName(reg), val);
+#endif
     }
     break;
 
     // Jump Commands
     case OP_JP_NN:
     {
-        gb->regs[REG_PC] = FetchWord(gb);
+        uint16_t addr = FetchWord(gb);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, JP $%02X\n", gb->regs[REG_PC] - 1, addr);
+#endif
+
+        gb->regs[REG_PC] = addr;
+    }
+    break;
+
+    case OP_JR_NZ_dd:
+    case OP_JR_Z_dd:
+    case OP_JR_NC_dd:
+    case OP_JR_C_dd:
+    {
+
+        uint8_t offset = FetchByte(gb);
+        uint8_t flag = (opcode >> 3) & 0b11;
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, JR %s,PC+$%01X\n", gb->regs[REG_PC] - 1, GetFlagName(flag), (uint8_t)offset);
+#endif
+        if (CheckFlag(gb, flag))
+        {
+            if ((offset & 0x80) > 0)
+            {
+                offset = ~offset;
+                offset += 1;
+
+                gb->regs[REG_PC] -= offset;
+            }
+            else
+            {
+                gb->regs[REG_PC] += offset;
+            }
+        }
     }
     break;
 
@@ -445,11 +729,13 @@ void StartGB(GB *gb)
 
     printf("GB Starting...\n");
 
-    gb->cart = LoadRom("tests/carts/cpu_instrs/individual/01-special.gb", &gb->cartSize);
+    gb->cart = LoadRom("tests/carts/cpu_instrs/individual/06-ld r,r.gb", &gb->cartSize);
     if (gb->cart == NULL)
     {
         return;
     }
+
+    DumpRomInfo(gb);
 
     // Info from https://realboyemulator.files.wordpress.com/2013/01/gbcpuman.pdf
     // Power Up Sequence (Found on Page 18)
@@ -467,7 +753,7 @@ void StartGB(GB *gb)
     // TODO: Run boot up procedure instead of jumping to cartridge immediately
     gb->regs[REG_PC] = 0x0100;
 
-    // memset(gb->mem, 0, sizeof(uint8_t) * 0x8000);
+    memset(gb->mem, 0xFF, sizeof(uint8_t) * 0x8000);
 
     // gb->mem[0x1800] = 0;
 
@@ -500,8 +786,13 @@ void StartGB(GB *gb)
             }
         }
 
-        running = DoInstruction(gb);
+        if (!DoInstruction(gb))
+        {
+            running = false;
+        }
 
         SimpleRender(gb, gb->ctx);
     }
+
+    DumpCPURegisters(gb);
 }
