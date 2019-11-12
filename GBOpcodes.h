@@ -1,65 +1,87 @@
 #pragma once
 
+#define REG_BC 0x0
+#define REG_DE 0x1
+#define REG_HL 0x2
+#define REG_SP 0x3
+#define REG_PC 0x4
+#define REG_AF 0x7
+
+#define REG_B 0x0
+#define REG_C 0x1
+#define REG_D 0x2
+#define REG_E 0x3
+#define REG_H 0x4
+#define REG_L 0x5
+#define REG_A 0x7
+
 #define OP_NOP 0x00
 
 // 8bit Load Commands
 // ld r,r
-#define OP_LD_B_B 0x40
-#define OP_LD_B_C 0x41
-#define OP_LD_B_D 0x42
-#define OP_LD_B_E 0x43
-#define OP_LD_B_H 0x44
-#define OP_LD_B_L 0x45
-#define OP_LD_B_A 0x47
+#define OP_LD_B_B (REG_B << 3 | REG_B | 0x40)
+#define OP_LD_B_C (REG_B << 3 | REG_C | 0x40)
+#define OP_LD_B_D (REG_B << 3 | REG_D | 0x40)
+#define OP_LD_B_E (REG_B << 3 | REG_E | 0x40)
+#define OP_LD_B_H (REG_B << 3 | REG_H | 0x40)
+#define OP_LD_B_L (REG_B << 3 | REG_L | 0x40)
+#define OP_LD_B_A (REG_B << 3 | REG_A | 0x40)
 
-#define OP_LD_C_B 0x48
-#define OP_LD_C_C 0x49
-#define OP_LD_C_D 0x4A
-#define OP_LD_C_E 0x4B
-#define OP_LD_C_H 0x4C
-#define OP_LD_C_L 0x4D
-#define OP_LD_C_A 0x4F
+#define OP_LD_C_B (REG_C << 3 | REG_B | 0x40)
+#define OP_LD_C_C (REG_C << 3 | REG_C | 0x40)
+#define OP_LD_C_D (REG_C << 3 | REG_D | 0x40)
+#define OP_LD_C_E (REG_C << 3 | REG_E | 0x40)
+#define OP_LD_C_H (REG_C << 3 | REG_H | 0x40)
+#define OP_LD_C_L (REG_C << 3 | REG_L | 0x40)
+#define OP_LD_C_A (REG_C << 3 | REG_A | 0x40)
 
-#define OP_LD_D_B 0x50
-#define OP_LD_D_C 0x51
-#define OP_LD_D_D 0x52
-#define OP_LD_D_E 0x53
-#define OP_LD_D_H 0x54
-#define OP_LD_D_L 0x55
-#define OP_LD_D_A 0x57
+#define OP_LD_D_B (REG_D << 3 | REG_B | 0x40)
+#define OP_LD_D_C (REG_D << 3 | REG_C | 0x40)
+#define OP_LD_D_D (REG_D << 3 | REG_D | 0x40)
+#define OP_LD_D_E (REG_D << 3 | REG_E | 0x40)
+#define OP_LD_D_H (REG_D << 3 | REG_H | 0x40)
+#define OP_LD_D_L (REG_D << 3 | REG_L | 0x40)
+#define OP_LD_D_A (REG_D << 3 | REG_A | 0x40)
 
-#define OP_LD_E_B 0x58
-#define OP_LD_E_C 0x59
-#define OP_LD_E_D 0x5A
-#define OP_LD_E_E 0x5B
-#define OP_LD_E_H 0x5C
-#define OP_LD_E_L 0x5D
-#define OP_LD_E_A 0x5F
+#define OP_LD_E_B (REG_E << 3 | REG_B | 0x40)
+#define OP_LD_E_C (REG_E << 3 | REG_C | 0x40)
+#define OP_LD_E_D (REG_E << 3 | REG_D | 0x40)
+#define OP_LD_E_E (REG_E << 3 | REG_E | 0x40)
+#define OP_LD_E_H (REG_E << 3 | REG_H | 0x40)
+#define OP_LD_E_L (REG_E << 3 | REG_L | 0x40)
+#define OP_LD_E_A (REG_E << 3 | REG_A | 0x40)
 
-#define OP_LD_H_B 0x60
-#define OP_LD_H_C 0x61
-#define OP_LD_H_D 0x62
-#define OP_LD_H_E 0x63
-#define OP_LD_H_H 0x64
-#define OP_LD_H_L 0x65
-#define OP_LD_H_A 0x67
+#define OP_LD_H_B (REG_H << 3 | REG_B | 0x40)
+#define OP_LD_H_C (REG_H << 3 | REG_C | 0x40)
+#define OP_LD_H_D (REG_H << 3 | REG_D | 0x40)
+#define OP_LD_H_E (REG_H << 3 | REG_E | 0x40)
+#define OP_LD_H_H (REG_H << 3 | REG_H | 0x40)
+#define OP_LD_H_L (REG_H << 3 | REG_L | 0x40)
+#define OP_LD_H_A (REG_H << 3 | REG_A | 0x40)
 
-#define OP_LD_L_B 0x68
-#define OP_LD_L_C 0x69
-#define OP_LD_L_D 0x6A
-#define OP_LD_L_E 0x6B
-#define OP_LD_L_H 0x6C
-#define OP_LD_L_L 0x6D
-#define OP_LD_L_A 0x6F
+#define OP_LD_L_B (REG_L << 3 | REG_B | 0x40)
+#define OP_LD_L_C (REG_L << 3 | REG_C | 0x40)
+#define OP_LD_L_D (REG_L << 3 | REG_D | 0x40)
+#define OP_LD_L_E (REG_L << 3 | REG_E | 0x40)
+#define OP_LD_L_H (REG_L << 3 | REG_H | 0x40)
+#define OP_LD_L_L (REG_L << 3 | REG_L | 0x40)
+#define OP_LD_L_A (REG_L << 3 | REG_A | 0x40)
 
-#define OP_LD_A_B 0x78
-#define OP_LD_A_C 0x79
-#define OP_LD_A_D 0x7A
-#define OP_LD_A_E 0x7B
-#define OP_LD_A_H 0x7C
-#define OP_LD_A_L 0x7D
-#define OP_LD_A_A 0x7F
+#define OP_LD_A_B (REG_A << 3 | REG_B | 0x40)
+#define OP_LD_A_C (REG_A << 3 | REG_C | 0x40)
+#define OP_LD_A_D (REG_A << 3 | REG_D | 0x40)
+#define OP_LD_A_E (REG_A << 3 | REG_E | 0x40)
+#define OP_LD_A_H (REG_A << 3 | REG_H | 0x40)
+#define OP_LD_A_L (REG_A << 3 | REG_L | 0x40)
+#define OP_LD_A_A (REG_A << 3 | REG_A | 0x40)
 //ld r,n
+#define OP_LD_B_nn (REG_B << 3 | 6)
+#define OP_LD_C_nn (REG_C << 3 | 6)
+#define OP_LD_D_nn (REG_D << 3 | 6)
+#define OP_LD_E_nn (REG_E << 3 | 6)
+#define OP_LD_H_nn (REG_H << 3 | 6)
+#define OP_LD_L_nn (REG_L << 3 | 6)
+#define OP_LD_A_nn (REG_A << 3 | 6)
 
 //ld r,[HL]
 #define OP_LD_B_ptrHL 0x46

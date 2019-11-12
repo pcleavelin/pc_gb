@@ -13,12 +13,6 @@
 
 #define RENDER_SCALE 4
 
-#define REG_BC 0x00
-#define REG_DE 0x01
-#define REG_HL 0x02
-#define REG_SP 0x03
-#define REG_PC 0x04
-
 // 0xFF40 - LCD Control Register
 // Bit 7 - LCD Power           (0=Off, 1=On)
 // Bit 6 - Window Tile Map     (0=9800h-9BFFh, 1=9C00h-9FFFh)
@@ -49,10 +43,9 @@ typedef struct GBstruct
 
     // Info From http://problemkaputt.de/pandocs.htm#cpuregistersandflags
 
-    // BC[0], DE[1], HL[2], SP[3], PC[4]
+    // BC[0], DE[1], HL[2], SP[3], PC[4], padding[5,6], AF[7]
     // Stored as an array for easier instruction handling
-    uint16_t regs[5];
-    uint8_t A, F;
+    uint16_t regs[8];
 
     // Flags
     // Bit 7 - Zero
@@ -223,7 +216,7 @@ uint8_t *LoadRom(const char *filename, uint32_t *romSize)
 void DumpCPURegisters(GB *gb)
 {
     printf("CPU Registers\n");
-    printf("\tA: 0x%01x\n", gb->A);
+    printf("\tA: 0x%01x\n", gb->regs[REG_AF]);
     printf("\tBC: 0x%02x\n", gb->regs[REG_BC]);
     printf("\tDE: 0x%02x\n", gb->regs[REG_DE]);
     printf("\tHL: 0x%02x\n", gb->regs[REG_HL]);
@@ -316,6 +309,32 @@ uint16_t FetchWord(GB *gb)
     return FetchByte(gb) | (FetchByte(gb) << 8);
 }
 
+void Set8Reg(GB *gb, uint8_t reg, uint8_t val)
+{
+    uint16_t bigVal = val;
+    uint16_t mask = 0xFF00;
+    if (reg % 2 == 0)
+    {
+        bigVal <<= 8;
+        mask >>= 8;
+    }
+
+    gb->regs[reg / 2] &= mask;
+    gb->regs[reg / 2] |= bigVal;
+}
+
+uint8_t Get8Reg(GB *gb, uint8_t reg)
+{
+    size_t index = reg == REG_A ? 7 : reg / 2;
+    uint16_t val = gb->regs[index];
+    if ((reg % 2) == 0 || reg == REG_A)
+    {
+        val >>= 8;
+    }
+
+    return val & 0xFF;
+}
+
 bool DoInstruction(GB *gb)
 {
     // Fetch opcode
@@ -382,25 +401,7 @@ bool DoInstruction(GB *gb)
         uint8_t regDst = (opcode >> 3) & 0b111;
         uint8_t regSrc = opcode & 0b111;
 
-        if (regDst == 7)
-        {
-            // If both src and dst are A do nothing
-            if (regSrc != 7)
-            {
-                gb->A = gb->regs[regSrc];
-            }
-        }
-        else
-        {
-            if (regSrc == 7)
-            {
-                gb->regs[regDst] = gb->A;
-            }
-            else
-            {
-                gb->regs[regDst] = gb->regs[regSrc];
-            }
-        }
+        Set8Reg(gb, regDst, Get8Reg(gb, regSrc));
     }
     break;
 
@@ -461,6 +462,7 @@ void StartGB(GB *gb)
     gb->regs[REG_DE] = 0x00D8;
     gb->regs[REG_HL] = 0x014D;
     gb->regs[REG_SP] = 0xFFFE;
+    gb->regs[REG_AF] = 0x0000;
 
     // TODO: Run boot up procedure instead of jumping to cartridge immediately
     gb->regs[REG_PC] = 0x0100;
