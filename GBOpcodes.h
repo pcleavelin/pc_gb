@@ -24,6 +24,12 @@
 #define FLAG_N 0x04
 #define FLAG_H 0x05
 
+#define VBLANK_MASK 0x1
+#define LCD_STAT_MASK 0x2
+#define TIMER_MASK 0x4
+#define SERIAL_MASK 0x8
+#define JOYPAD_MASK 0x10
+
 #define OP_NOP 0x00
 
 //--------------------------------8bit Load Commands--------------------------------
@@ -107,8 +113,11 @@
 // ldi A, (HL)
 #define OP_LDI_A_ptrHL 0x2A
 
+// ldi (HL), A
+#define OP_LDI_ptrHL_A 0x22
+
 // ldd (HL), A
-#define OP_LDI_ptrHL_A 0x32
+#define OP_LDD_ptrHL_A 0x32
 
 // ld r,(HL)
 #define OP_LD_B_ptrHL 0x46
@@ -120,12 +129,45 @@
 #define OP_LD_A_ptrHL 0x7E
 
 // ld (HL),r
+#define OP_LD_ptrHL_B (0x70 | REG_B)
+#define OP_LD_ptrHL_C (0x70 | REG_C)
+#define OP_LD_ptrHL_D (0x70 | REG_D)
+#define OP_LD_ptrHL_E (0x70 | REG_E)
+#define OP_LD_ptrHL_H (0x70 | REG_H)
+#define OP_LD_ptrHL_L (0x70 | REG_L)
+#define OP_LD_ptrHL_A (0x70 | REG_A)
+
+// ld (HL),n
 #define OP_LD_ptrHL_n 0x36
+
+// ld A,(BC)
+#define OP_LD_A_ptrBC 0x0A
+
+// ld A,(DE)
+#define OP_LD_A_ptrDE 0x1A
+
+// ld A,(nn)
+#define OP_LD_A_ptrnn 0xFA
+
+// ld (BC),A
+#define OP_LD_ptrBC_A 0x02
 
 // ld (nn), A
 #define OP_LD_ptrnn_A 0xEA
 
 //--------------------------------8bit Arthmetic/logical Commands---------------------
+// add r
+#define OP_ADD_A_ptrHL 0x86
+
+// sub r
+#define OP_SUB_B (0x90 | REG_B)
+#define OP_SUB_C (0x90 | REG_C)
+#define OP_SUB_D (0x90 | REG_D)
+#define OP_SUB_E (0x90 | REG_E)
+#define OP_SUB_H (0x90 | REG_H)
+#define OP_SUB_L (0x90 | REG_L)
+#define OP_SUB_A (0x90 | REG_A)
+
 // and r
 #define OP_AND_B (0xA0 | REG_B)
 #define OP_AND_C (0xA0 | REG_C)
@@ -156,6 +198,9 @@
 // cp n
 #define OP_CP_n 0xFE
 
+// cp (HL)
+#define OP_CP_ptrHL 0xBE
+
 // inc r
 #define OP_INC_B (REG_B << 3 | 4)
 #define OP_INC_C (REG_C << 3 | 4)
@@ -174,23 +219,69 @@
 #define OP_DEC_L (REG_L << 3 | 5)
 #define OP_DEC_A (REG_A << 3 | 5)
 
+// cpl
+#define OP_CPL 0x2F
+
 //--------------------------------16bit Load Commands--------------------------------
 // ld rr,nn
-#define OP_LD_BC_NN 0x01
-#define OP_LD_DE_NN 0x11
-#define OP_LD_HL_NN 0x21
-#define OP_LD_SP_NN 0x31
+#define OP_LD_BC_nn 0x01
+#define OP_LD_DE_nn 0x11
+#define OP_LD_HL_nn 0x21
+#define OP_LD_SP_nn 0x31
 // ld SP, HL
 #define OP_LD_SP_HL 0xF9
 
+// push rr
+#define OP_PUSH_BC (REG_BC << 4 | 0xC5)
+#define OP_PUSH_DE (REG_DE << 4 | 0xC5)
+#define OP_PUSH_HL (REG_HL << 4 | 0xC5)
+#define OP_PUSH_AF (REG_AF << 4 | 0xC5)
+
+// pop rr
+#define OP_POP_BC (REG_BC << 4 | 0xC1)
+#define OP_POP_DE (REG_DE << 4 | 0xC1)
+#define OP_POP_HL (REG_HL << 4 | 0xC1)
+#define OP_POP_AF (REG_AF << 4 | 0xC1)
+
 //--------------------------------16bit Arthmetic Commands----------------------------
+// inc rr
+#define OP_INC_BC (REG_BC << 4 | 0x3)
+#define OP_INC_DE (REG_DE << 4 | 0x3)
+#define OP_INC_HL (REG_HL << 4 | 0x3)
+#define OP_INC_SP (REG_SP << 4 | 0x3)
+
+// dec rr
 #define OP_DEC_BC (REG_BC << 4 | 0xB)
 #define OP_DEC_DE (REG_DE << 4 | 0xB)
 #define OP_DEC_HL (REG_HL << 4 | 0xB)
 #define OP_DEC_SP (REG_SP << 4 | 0xB)
 
+//------------------------------Rotate/Shift Commands---------------------------------
+// rla
+#define OP_RLA 0x17
+
+// rl r
+#define OP_CB_RL_B (REG_B | 0x10)
+#define OP_CB_RL_C (REG_C | 0x10)
+#define OP_CB_RL_D (REG_D | 0x10)
+#define OP_CB_RL_E (REG_E | 0x10)
+#define OP_CB_RL_H (REG_H | 0x10)
+#define OP_CB_RL_L (REG_L | 0x10)
+#define OP_CB_RL_A (REG_A | 0x10)
+
+//------------------------------Single Bit Operation Commands-------------------------
+// bit n,r
+#define OP_CB_BIT_n_B (REG_B | 0x78)
+#define OP_CB_BIT_n_C (REG_C | 0x78)
+#define OP_CB_BIT_n_D (REG_D | 0x78)
+#define OP_CB_BIT_n_E (REG_E | 0x78)
+#define OP_CB_BIT_n_H (REG_H | 0x78)
+#define OP_CB_BIT_n_L (REG_L | 0x78)
+#define OP_CB_BIT_n_A (REG_A | 0x78)
+
 //--------------------------------CPU Control Commands--------------------------------
 #define OP_DI 0xF3
+#define OP_EI 0xFB
 
 // Jump Commands
 // jp nn
@@ -199,11 +290,38 @@
 // jp HL
 #define OP_JP_HL 0xE9
 
+// jp f,nn
+#define OP_JP_NZ_nn (FLAG_NZ << 3 | 0xC2)
+#define OP_JP_Z_nn (FLAG_Z << 3 | 0xC2)
+#define OP_JP_NC_nn (FLAG_NC << 3 | 0xC2)
+#define OP_JP_C_nn (FLAG_C << 3 | 0xC2)
+
 // jr f,PC+dd
 #define OP_JR_NZ_dd (FLAG_NZ << 3 | 0x20)
 #define OP_JR_Z_dd (FLAG_Z << 3 | 0x20)
 #define OP_JR_NC_dd (FLAG_NC << 3 | 0x20)
 #define OP_JR_C_dd (FLAG_C << 3 | 0x20)
+
+// jr PC+dd
 #define OP_JR_dd 0x18
+
+// call nn
 #define OP_CALL_nn 0xCD
+
+// call f,nn
+#define OP_CALL_NZ_nn (FLAG_NZ << 3 | 0xC4)
+#define OP_CALL_Z_nn (FLAG_Z << 3 | 0xC4)
+#define OP_CALL_NC_nn (FLAG_NC << 3 | 0xC4)
+#define OP_CALL_C_nn (FLAG_C << 3 | 0xC4)
+
+// ret
 #define OP_RET 0xC9
+
+// ret f
+#define OP_RET_NZ_nn (FLAG_NZ << 3 | 0xC0)
+#define OP_RET_Z_nn (FLAG_Z << 3 | 0xC0)
+#define OP_RET_NC_nn (FLAG_NC << 3 | 0xC0)
+#define OP_RET_C_nn (FLAG_C << 3 | 0xC0)
+
+// reti
+#define OP_RETI 0xD9
