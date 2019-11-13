@@ -177,6 +177,9 @@
 #define OP_AND_L (0xA0 | REG_L)
 #define OP_AND_A (0xA0 | REG_A)
 
+// and n
+#define OP_AND_A_nn 0xE6
+
 // xor r
 #define OP_XOR_B (0xA8 | REG_B)
 #define OP_XOR_C (0xA8 | REG_C)
@@ -269,6 +272,15 @@
 #define OP_CB_RL_L (REG_L | 0x10)
 #define OP_CB_RL_A (REG_A | 0x10)
 
+// swap r
+#define OP_CB_SWAP_B (REG_B | 0x30)
+#define OP_CB_SWAP_C (REG_C | 0x30)
+#define OP_CB_SWAP_D (REG_D | 0x30)
+#define OP_CB_SWAP_E (REG_E | 0x30)
+#define OP_CB_SWAP_H (REG_H | 0x30)
+#define OP_CB_SWAP_L (REG_L | 0x30)
+#define OP_CB_SWAP_A (REG_A | 0x30)
+
 //------------------------------Single Bit Operation Commands-------------------------
 // bit n,r
 #define OP_CB_BIT_n_B (REG_B | 0x78)
@@ -325,3 +337,12 @@
 
 // reti
 #define OP_RETI 0xD9
+
+// rst n
+#define OP_RST_00 (1 << 3 | 0xC7)
+#define OP_RST_08 (2 << 3 | 0xC7)
+#define OP_RST_10 (3 << 3 | 0xC7)
+#define OP_RST_18 (4 << 3 | 0xC7)
+#define OP_RST_20 (5 << 3 | 0xC7)
+#define OP_RST_28 (6 << 3 | 0xC7)
+#define OP_RST_30 (7 << 3 | 0xC7)

@@ -9,7 +9,7 @@
 
 #include "GBOpcodes.h"
 
-#define _DBG_INSTR_
+// #define _DBG_INSTR_
 
 #define GB_VID_WIDTH 160
 #define GB_VID_HEIGHT 144
@@ -137,7 +137,7 @@ RenderContext *CreateRenderContext()
 
     ctx->window = SDL_CreateWindow(
         "pc_gb",
-        SDL_WINDOWPOS_CENTERED,
+        -1080,
         SDL_WINDOWPOS_CENTERED,
         GB_VID_WIDTH * RENDER_SCALE,
         GB_VID_HEIGHT * RENDER_SCALE,
@@ -220,6 +220,11 @@ void WriteMem(GB *gb, uint16_t addr, uint8_t val)
         if (addr == 0xFF44)
         {
             gb->mem[addr - 0x8000] = 0;
+        }
+        else if (addr == 0xFF50)
+        {
+            printf("Touching DMG rom flag\n");
+            gb->mem[addr - 0x8000] = val;
         }
         else
         {
@@ -580,20 +585,19 @@ bool CheckInterrupt(GB *gb, uint8_t mask)
     }
 }
 
-void CallInterrupt(GB *gb, uint8_t vector)
-{
-    printf("Calling interrupt: $%01X", vector);
-
-    gb->regs[REG_SP] -= 2;
-    WriteMem(gb, gb->regs[REG_SP], gb->regs[REG_PC]);
-    gb->regs[REG_PC] = vector;
-}
-
 void Push16(GB *gb, uint16_t val)
 {
     gb->regs[REG_SP] -= 2;
     WriteMem(gb, gb->regs[REG_SP] + 1, (val & 0xFF00) >> 8);
     WriteMem(gb, gb->regs[REG_SP] + 2, val & 0xFF);
+}
+
+void CallInterrupt(GB *gb, uint8_t vector)
+{
+    printf("Calling interrupt: $%01X", vector);
+
+    Push16(gb, gb->regs[REG_PC]);
+    gb->regs[REG_PC] = vector;
 }
 
 uint16_t Pop16(GB *gb)
@@ -637,6 +641,28 @@ bool DoCBInstruction(GB *gb)
     }
     break;
 
+    case OP_CB_SWAP_B:
+    case OP_CB_SWAP_C:
+    case OP_CB_SWAP_D:
+    case OP_CB_SWAP_E:
+    case OP_CB_SWAP_H:
+    case OP_CB_SWAP_L:
+    case OP_CB_SWAP_A:
+    {
+        uint8_t reg = opcode & 0b111;
+        uint8_t val = Get8Reg(gb, reg);
+        uint8_t lo = val & 0xF;
+
+        val = (val >> 4) | (lo << 4);
+
+        Set8Reg(gb, reg, val);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, SWAP %s\n", instrPC, GetReg8Name(reg));
+#endif
+    }
+    break;
+
     // --------------------Single Bit Operation Commands-------------------------------
     case OP_CB_BIT_n_B:
     case OP_CB_BIT_n_C:
@@ -671,6 +697,11 @@ bool DoCBInstruction(GB *gb)
 bool DoInstruction(GB *gb)
 {
     const uint16_t instrPC = gb->regs[REG_PC];
+
+    if (instrPC == 0xfe && gb->mem[0xFF50 - 0x8000] == 0)
+    {
+        printf("Booted Up!\n");
+    }
 
     // Fetch opcode
     uint8_t opcode = FetchByte(gb);
@@ -1006,6 +1037,23 @@ bool DoInstruction(GB *gb)
 
 #ifdef _DBG_INSTR_
         printf("PC: 0x%02X, AND %s\n", instrPC, GetReg8Name(reg));
+#endif
+    }
+    break;
+
+    case OP_AND_A_nn:
+    {
+        uint8_t val = FetchByte(gb);
+        uint8_t newVal = Get8Reg(gb, REG_A) & val;
+        Set8Reg(gb, REG_A, newVal);
+
+        SetFlag(gb, FLAG_Z, newVal == 0);
+        SetFlag(gb, FLAG_C, 0);
+        SetFlag(gb, FLAG_N, 0);
+        SetFlag(gb, FLAG_H, 1);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, AND $%01X\n", instrPC, val);
 #endif
     }
     break;
@@ -1427,6 +1475,24 @@ bool DoInstruction(GB *gb)
     }
     break;
 
+    case OP_RST_00:
+    case OP_RST_08:
+    case OP_RST_10:
+    case OP_RST_18:
+    case OP_RST_20:
+    case OP_RST_28:
+    case OP_RST_30:
+    {
+        uint8_t val = (FetchByte(gb) >> 3) & 0b111;
+        Push16(gb, gb->regs[REG_PC]);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, RST $%01X - (return to $%02X)\n", instrPC, val, gb->regs[REG_PC]);
+#endif
+        gb->regs[REG_PC] = val;
+    }
+    break;
+
     default:
     {
         DumpCPURegisters(gb);
@@ -1455,10 +1521,10 @@ void StartGB(GB *gb)
     }
 
     // gb->cart = LoadRom("../tests/carts/cpu_instrs/individual/06-ld r,r.gb", &gb->cartSize);
-    // gb->cart = LoadRom("../tests/carts/Tetris (JUE) (V1.1) [!].gb", &gb->cartSize);
+    gb->cart = LoadRom("../tests/carts/Tetris (JUE) (V1.1) [!].gb", &gb->cartSize);
     // gb->cart = LoadRom("../tests/carts/Dr. Mario (JU) (V1.1).gb", &gb->cartSize);
     // gb->cart = LoadRom("../tests/carts/Cadillac II (J).gb", &gb->cartSize);
-    gb->cart = LoadRom("../tests/carts/Legend of Zelda, The - Link's Awakening (U) (V1.2) [!].gb", &gb->cartSize);
+    // gb->cart = LoadRom("../tests/carts/Legend of Zelda, The - Link's Awakening (U) (V1.2) [!].gb", &gb->cartSize);
     if (gb->cart == NULL)
     {
         return;
@@ -1480,7 +1546,7 @@ void StartGB(GB *gb)
     gb->regs[REG_AF] = 0x0000;
 
     // TODO: Run boot up procedure instead of jumping to cartridge immediately
-    gb->regs[REG_PC] = 0x100;
+    gb->regs[REG_PC] = 0x0;
     gb->IME = false;
 
     memset(gb->mem, 0x00, sizeof(uint8_t) * 0x8000);
