@@ -259,9 +259,24 @@ void SimpleRender(GB *gb, RenderContext *ctx)
         (void **)(&ctx->pixels),
         &ctx->pitch);
 
+    // Get Color shades
+    uint32_t colors[4] = {
+        0xFFFFFFFF,
+        0x7E7E7EFF,
+        0x3F3F3FFF,
+        0xFF,
+    };
+
+    uint32_t color0 = colors[(ReadMem(gb, 0xFF47)) & 0b11];
+    uint32_t color1 = colors[(ReadMem(gb, 0xFF47) >> 2) & 0b11];
+    uint32_t color2 = colors[(ReadMem(gb, 0xFF47) >> 4) & 0b11];
+    uint32_t color3 = colors[(ReadMem(gb, 0xFF47) >> 6) & 0b11];
+
     // Render Each Tile
-    uint16_t tileBase = 0x8000;
-    uint16_t bgBase = 0x9800;
+    uint8_t lcdControl = ReadMem(gb, 0xFF40);
+
+    uint16_t tileBase = (lcdControl & 0x10) > 0 ? 0x8000 : 0x8800;
+    uint16_t bgBase = (lcdControl & 0x8) > 0 ? 0x9C00 : 0x9800;
     for (int i = 0; i < 32; ++i)
     {
         for (int j = 0; j < 32; ++j)
@@ -298,19 +313,19 @@ void SimpleRender(GB *gb, RenderContext *ctx)
                         {
                             if (color == 0)
                             {
-                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = 0xFF;
+                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = color0;
                             }
                             else if (color == 1)
                             {
-                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = 0x3F3F3FFF;
+                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = color1;
                             }
                             else if (color == 2)
                             {
-                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = 0x7E7E7EFF;
+                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = color2;
                             }
                             else if (color == 3)
                             {
-                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = 0xFFFFFFFF;
+                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = color3;
                             }
                         }
                     }
@@ -437,31 +452,76 @@ char *GetFlagName(uint8_t flag)
     }
 }
 
+void SetFlag(GB *gb, uint8_t flag, uint8_t val)
+{
+    uint8_t mask = 1;
+
+    switch (flag)
+    {
+    case FLAG_Z:
+    {
+        mask <<= 7;
+    }
+    break;
+
+    case FLAG_C:
+    {
+        mask <<= 4;
+    }
+    break;
+
+    case FLAG_N:
+    {
+        mask <<= 6;
+    }
+    break;
+
+    case FLAG_H:
+    {
+        mask <<= 5;
+    }
+    break;
+
+    default:
+        printf("Trying to set invalid flag. This shouldn't be called!\n");
+        return;
+    }
+
+    if (val > 0)
+    {
+        gb->regs[REG_AF] |= mask;
+    }
+    else
+    {
+        gb->regs[REG_AF] &= ~mask;
+    }
+}
+
 bool CheckFlag(GB *gb, uint8_t flag)
 {
     switch (flag)
     {
     case FLAG_NZ:
     {
-        return (gb->regs[REG_AF] & 0x8) == 0;
+        return (gb->regs[REG_AF] & 0x80) == 0;
     }
     break;
 
     case FLAG_Z:
     {
-        return (gb->regs[REG_AF] & 0x8) > 0;
+        return (gb->regs[REG_AF] & 0x80) > 0;
     }
     break;
 
     case FLAG_NC:
     {
-        return (gb->regs[REG_AF] & 0x10) == 0;
+        return (gb->regs[REG_AF] & 0x8) == 0;
     }
     break;
 
     case FLAG_C:
     {
-        return (gb->regs[REG_AF] & 0x10) >= 0;
+        return (gb->regs[REG_AF] & 0x8) >= 0;
     }
     break;
 
@@ -576,12 +636,39 @@ bool DoInstruction(GB *gb)
     }
     break;
 
+    case OP_LD_A_IOn:
+    {
+        // TODO: read from io port
+        uint8_t offset = FetchByte(gb);
+        if (offset < 0x7F)
+            Set8Reg(gb, REG_A, ReadMem(gb, 0xFF00 + offset));
+
+#ifndef _DBG_INSTR_
+            // printf("PC: 0x%02X, LD A, (FF00+$%01X) - A is now 0x%01X!\n", gb->regs[REG_PC] - 1, offset, Get8Reg(gb, REG_A));
+#endif
+    }
+    break;
+
     case OP_LD_IOn_A:
     {
         // TODO: write to io port
         uint8_t offset = FetchByte(gb);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD (FF00+$%01X),A - NOT IMPLEMENTED!\n", gb->regs[REG_PC] - 1, offset);
+        if (offset < 0x7F)
+            WriteMem(gb, 0xFF00 + offset, Get8Reg(gb, REG_A));
+#ifndef _DBG_INSTR_
+        printf("PC: 0x%02X, LD (FF00+$%01X),A - now $%01X!\n", gb->regs[REG_PC] - 1, offset, ReadMem(gb, 0xFF00 + offset));
+#endif
+    }
+    break;
+
+    case OP_LD_IOC_A:
+    {
+        // TODO: write to io port
+        uint8_t offset = Get8Reg(gb, REG_C);
+        if (offset < 0x7F)
+            WriteMem(gb, 0xFF00 + offset, Get8Reg(gb, REG_A));
+#ifndef _DBG_INSTR_
+        printf("PC: 0x%02X, LD (FF00+$%01X),A - now $%01X!\n", gb->regs[REG_PC] - 1, offset, ReadMem(gb, 0xFF00 + offset));
 #endif
     }
     break;
@@ -596,6 +683,29 @@ bool DoInstruction(GB *gb)
 
 #ifdef _DBG_INSTR_
         printf("PC: 0x%02X, LDI A,($%02X) - (HL)\n", gb->regs[REG_PC] - 1, gb->regs[REG_HL]);
+#endif
+    }
+    break;
+
+    case OP_LDI_ptrHL_A:
+    {
+        uint8_t val = Get8Reg(gb, REG_A);
+        WriteMem(gb, gb->regs[REG_HL], val);
+        gb->regs[REG_HL] -= 1;
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LDD ($%02X), A - (HL)\n", gb->regs[REG_PC] - 1, gb->regs[REG_HL]);
+#endif
+    }
+    break;
+
+    case OP_LD_ptrHL_n:
+    {
+        uint8_t val = FetchByte(gb);
+        WriteMem(gb, gb->regs[REG_HL], val);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, LD ($%02X), $%01X - (HL)\n", gb->regs[REG_PC] - 1, gb->regs[REG_HL], val);
 #endif
     }
     break;
@@ -622,10 +732,63 @@ bool DoInstruction(GB *gb)
     case OP_AND_A:
     {
         uint8_t reg = opcode & 0b111;
-        Set8Reg(gb, REG_A, Get8Reg(gb, reg));
+        uint8_t val = Get8Reg(gb, REG_A) & Get8Reg(gb, reg);
+        Set8Reg(gb, REG_A, val);
 
 #ifdef _DBG_INSTR_
         printf("PC: 0x%02X, AND %s\n", gb->regs[REG_PC] - 1, Get8Reg(gb, reg));
+#endif
+    }
+    break;
+
+    case OP_XOR_B:
+    case OP_XOR_C:
+    case OP_XOR_D:
+    case OP_XOR_E:
+    case OP_XOR_H:
+    case OP_XOR_L:
+    case OP_XOR_A:
+    {
+        uint8_t reg = opcode & 0b111;
+        uint8_t val = Get8Reg(gb, REG_A) ^ Get8Reg(gb, reg);
+        Set8Reg(gb, REG_A, val);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, XOR %s\n", gb->regs[REG_PC] - 1, GetReg8Name(reg));
+#endif
+    }
+    break;
+
+    case OP_OR_B:
+    case OP_OR_C:
+    case OP_OR_D:
+    case OP_OR_E:
+    case OP_OR_H:
+    case OP_OR_L:
+    case OP_OR_A:
+    {
+        uint8_t reg = opcode & 0b111;
+        uint8_t val = Get8Reg(gb, REG_A) | Get8Reg(gb, reg);
+        Set8Reg(gb, REG_A, val);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, OR %s\n", gb->regs[REG_PC] - 1, GetReg8Name(reg));
+#endif
+    }
+    break;
+
+    case OP_CP_n:
+    {
+        uint8_t val = FetchByte(gb);
+        uint8_t newVal = Get8Reg(gb, REG_A) - val;
+
+        SetFlag(gb, FLAG_Z, newVal == 0);
+        SetFlag(gb, FLAG_C, newVal > Get8Reg(gb, REG_A));
+        SetFlag(gb, FLAG_N, 1);
+        SetFlag(gb, FLAG_H, (newVal & 0xF) < (Get8Reg(gb, REG_A) & 0xF));
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, cp $%01X\n", gb->regs[REG_PC] - 1, val);
 #endif
     }
     break;
@@ -642,17 +805,11 @@ bool DoInstruction(GB *gb)
         uint8_t reg = (opcode >> 3) & 0b111;
         uint8_t val = Get8Reg(gb, reg) + 1;
 
-        Set8Reg(gb, reg, val);
+        SetFlag(gb, FLAG_Z, val == 0);
+        SetFlag(gb, FLAG_N, 0);
+        SetFlag(gb, FLAG_H, (val & 0xF) < (Get8Reg(gb, reg) & 0xF));
 
-        if (val == 0)
-        {
-            gb->regs[REG_AF] |= 0x8;
-        }
-        else
-        {
-            gb->regs[REG_AF] &= ~0x8;
-        }
-        gb->regs[REG_AF] &= ~0x4;
+        Set8Reg(gb, reg, val);
 
 #ifdef _DBG_INSTR_
         printf("PC: 0x%02X, INC %s\n", gb->regs[REG_PC] - 1, GetReg8Name(reg));
@@ -674,16 +831,9 @@ bool DoInstruction(GB *gb)
 
         Set8Reg(gb, reg, val);
 
-        if (val == 0)
-        {
-            gb->regs[REG_AF] |= 0x8;
-        }
-        else
-        {
-            gb->regs[REG_AF] &= ~0x8;
-        }
-
-        gb->regs[REG_AF] |= 0x4;
+        SetFlag(gb, FLAG_Z, val == 0);
+        SetFlag(gb, FLAG_N, 1);
+        SetFlag(gb, FLAG_H, (val & 0xF) > (Get8Reg(gb, reg) & 0xF));
 
 #ifdef _DBG_INSTR_
         printf("PC: 0x%02X, DEC %s\n", gb->regs[REG_PC] - 1, GetReg8Name(reg));
@@ -705,6 +855,22 @@ bool DoInstruction(GB *gb)
 
 #ifdef _DBG_INSTR_
         printf("PC: 0x%02X, LD %s,$%02X\n", gb->regs[REG_PC] - 1, GetRegName(reg), val);
+#endif
+    }
+    break;
+
+    case OP_DEC_BC:
+    case OP_DEC_DE:
+    case OP_DEC_HL:
+    case OP_DEC_SP:
+    {
+        uint8_t reg = (opcode >> 4);
+        uint8_t val = Get8Reg(gb, reg) - 1;
+
+        Set8Reg(gb, reg, val);
+
+#ifdef _DBG_INSTR_
+        printf("PC: 0x%02X, DEC %s\n", gb->regs[REG_PC] - 1, GetRegName(reg));
 #endif
     }
     break;
@@ -757,6 +923,10 @@ bool DoInstruction(GB *gb)
             {
                 gb->regs[REG_PC] += offset;
             }
+        }
+        else
+        {
+            // printf("didn't jump\n");
         }
     }
     break;
@@ -826,7 +996,8 @@ void StartGB(GB *gb)
 
     printf("GB Starting...\n");
 
-    gb->cart = LoadRom("tests/carts/Tetris (JUE) (V1.1) [!].gb", &gb->cartSize);
+    // gb->cart = LoadRom("../tests/carts/cpu_instrs/individual/06-ld r,r.gb", &gb->cartSize);
+    gb->cart = LoadRom("../tests/carts/Tetris (JUE) (V1.1) [!].gb", &gb->cartSize);
     if (gb->cart == NULL)
     {
         return;
@@ -850,26 +1021,31 @@ void StartGB(GB *gb)
     // TODO: Run boot up procedure instead of jumping to cartridge immediately
     gb->regs[REG_PC] = 0x0100;
 
-    memset(gb->mem, 0xFF, sizeof(uint8_t) * 0x8000);
+    memset(gb->mem, 0xEA, sizeof(uint8_t) * 0x8000);
 
-    // gb->mem[0x1800] = 0;
+    gb->mem[0x1C00] = 0;
 
-    // gb->mem[0] = 0x7C;
-    // gb->mem[1] = 0x7C;
-    // gb->mem[2] = 0x00;
-    // gb->mem[3] = 0xC6;
-    // gb->mem[4] = 0xC6;
-    // gb->mem[5] = 0x00;
-    // gb->mem[6] = 0x00;
-    // gb->mem[7] = 0xFE;
-    // gb->mem[8] = 0xC6;
-    // gb->mem[9] = 0xC6;
-    // gb->mem[0xa] = 0x00;
-    // gb->mem[0xb] = 0xC6;
-    // gb->mem[0xc] = 0xC6;
-    // gb->mem[0xd] = 0x00;
-    // gb->mem[0xe] = 0x00;
-    // gb->mem[0xf] = 0x00;
+    gb->mem[0] = 0x7C;
+    gb->mem[1] = 0x7C;
+    gb->mem[2] = 0x00;
+    gb->mem[3] = 0xC6;
+    gb->mem[4] = 0xC6;
+    gb->mem[5] = 0x00;
+    gb->mem[6] = 0x00;
+    gb->mem[7] = 0xFE;
+    gb->mem[8] = 0xC6;
+    gb->mem[9] = 0xC6;
+    gb->mem[0xa] = 0x00;
+    gb->mem[0xb] = 0xC6;
+    gb->mem[0xc] = 0xC6;
+    gb->mem[0xd] = 0x00;
+    gb->mem[0xe] = 0x00;
+    gb->mem[0xf] = 0x00;
+
+    SimpleRender(gb, gb->ctx);
+
+    uint64_t count = 0;
+    uint8_t LY = 0;
 
     bool running = true;
     while (running)
@@ -883,14 +1059,33 @@ void StartGB(GB *gb)
             }
         }
 
+        WriteMem(gb, 0xFF44, LY);
+
         if (!DoInstruction(gb))
         {
             running = false;
         }
 
-        SimpleRender(gb, gb->ctx);
+        if ((count % 1024 * 2) == 0)
+        {
+            SimpleRender(gb, gb->ctx);
+            LY += 1;
+
+            if (LY == 144)
+            {
+                uint8_t val = ReadMem(gb, 0xFF0F);
+                val |= 1;
+                WriteMem(gb, 0xFF0F, val);
+            }
+            if (LY > 153)
+            {
+                LY = 0;
+            }
+        }
+
+        count += 1;
     }
 
     SimpleRender(gb, gb->ctx);
-    // DumpCPURegisters(gb);
+    DumpCPURegisters(gb);
 }

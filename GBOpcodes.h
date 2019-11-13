@@ -20,9 +20,13 @@
 #define FLAG_NC 0x2
 #define FLAG_C 0x3
 
+// Rarely used flags
+#define FLAG_N 0x04
+#define FLAG_H 0x05
+
 #define OP_NOP 0x00
 
-// 8bit Load Commands
+//--------------------------------8bit Load Commands--------------------------------
 // ld r,r
 #define OP_LD_B_B (REG_B << 3 | REG_B | 0x40)
 #define OP_LD_B_C (REG_B << 3 | REG_C | 0x40)
@@ -91,11 +95,20 @@
 // ld (DE), A
 #define OP_LD_ptrDE_A 0x12
 
+// ld A,(FF00+n)
+#define OP_LD_A_IOn 0xF0
+
 // ld (FF00+n),A
 #define OP_LD_IOn_A 0xE0
 
+// ld (FF00+C),A
+#define OP_LD_IOC_A 0xE2
+
 // ldi A, (HL)
 #define OP_LDI_A_ptrHL 0x2A
+
+// ldd (HL), A
+#define OP_LDI_ptrHL_A 0x32
 
 // ld r,(HL)
 #define OP_LD_B_ptrHL 0x46
@@ -106,10 +119,13 @@
 #define OP_LD_L_ptrHL 0x6E
 #define OP_LD_A_ptrHL 0x7E
 
+// ld (HL),r
+#define OP_LD_ptrHL_n 0x36
+
 // ld (nn), A
 #define OP_LD_ptrnn_A 0xEA
 
-// 8bit Arthmetic/logical Commands
+//--------------------------------8bit Arthmetic/logical Commands---------------------
 // and r
 #define OP_AND_B (0xA0 | REG_B)
 #define OP_AND_C (0xA0 | REG_C)
@@ -118,6 +134,27 @@
 #define OP_AND_H (0xA0 | REG_H)
 #define OP_AND_L (0xA0 | REG_L)
 #define OP_AND_A (0xA0 | REG_A)
+
+// xor r
+#define OP_XOR_B (0xA8 | REG_B)
+#define OP_XOR_C (0xA8 | REG_C)
+#define OP_XOR_D (0xA8 | REG_D)
+#define OP_XOR_E (0xA8 | REG_E)
+#define OP_XOR_H (0xA8 | REG_H)
+#define OP_XOR_L (0xA8 | REG_L)
+#define OP_XOR_A (0xA8 | REG_A)
+
+// or R
+#define OP_OR_B (0xB0 | REG_B)
+#define OP_OR_C (0xB0 | REG_C)
+#define OP_OR_D (0xB0 | REG_D)
+#define OP_OR_E (0xB0 | REG_E)
+#define OP_OR_H (0xB0 | REG_H)
+#define OP_OR_L (0xB0 | REG_L)
+#define OP_OR_A (0xB0 | REG_A)
+
+// cp n
+#define OP_CP_n 0xFE
 
 // inc r
 #define OP_INC_B (REG_B << 3 | 4)
@@ -137,7 +174,7 @@
 #define OP_DEC_L (REG_L << 3 | 5)
 #define OP_DEC_A (REG_A << 3 | 5)
 
-// 16bit Load Commands
+//--------------------------------16bit Load Commands--------------------------------
 // ld rr,nn
 #define OP_LD_BC_NN 0x01
 #define OP_LD_DE_NN 0x11
@@ -146,7 +183,13 @@
 // ld SP, HL
 #define OP_LD_SP_HL 0xF9
 
-// CPU Control Commands
+//--------------------------------16bit Arthmetic Commands----------------------------
+#define OP_DEC_BC (REG_BC << 4 | 0xB)
+#define OP_DEC_DE (REG_DE << 4 | 0xB)
+#define OP_DEC_HL (REG_HL << 4 | 0xB)
+#define OP_DEC_SP (REG_SP << 4 | 0xB)
+
+//--------------------------------CPU Control Commands--------------------------------
 #define OP_DI 0xF3
 
 // Jump Commands
