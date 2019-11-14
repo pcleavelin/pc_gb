@@ -5,7 +5,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <memory.h>
+
+#ifdef WIN32
 #include <SDL2/SDL.h>
+#elif __APPLE__
+#include <SDL.h>
+#endif
 
 #include "GBOpcodes.h"
 
@@ -583,6 +588,8 @@ bool CheckInterrupt(GB *gb, uint8_t mask)
 
         return true;
     }
+
+    return false;
 }
 
 void Push16(GB *gb, uint16_t val)

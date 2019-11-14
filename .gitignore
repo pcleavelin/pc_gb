@@ -1,3 +1,5 @@
 build/*
 thirdparty/*
 tests/carts/*
+
+.DS_Store
