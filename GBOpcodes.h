@@ -120,13 +120,13 @@
 #define OP_LDD_ptrHL_A 0x32
 
 // ld r,(HL)
-#define OP_LD_B_ptrHL 0x46
-#define OP_LD_C_ptrHL 0x4E
-#define OP_LD_D_ptrHL 0x56
-#define OP_LD_E_ptrHL 0x4E
-#define OP_LD_H_ptrHL 0x66
-#define OP_LD_L_ptrHL 0x6E
-#define OP_LD_A_ptrHL 0x7E
+#define OP_LD_B_ptrHL (REG_B << 3 | 0x46)
+#define OP_LD_C_ptrHL (REG_C << 3 | 0x46)
+#define OP_LD_D_ptrHL (REG_D << 3 | 0x46)
+#define OP_LD_E_ptrHL (REG_E << 3 | 0x46)
+#define OP_LD_H_ptrHL (REG_H << 3 | 0x46)
+#define OP_LD_L_ptrHL (REG_L << 3 | 0x46)
+#define OP_LD_A_ptrHL (REG_A << 3 | 0x46)
 
 // ld (HL),r
 #define OP_LD_ptrHL_B (0x70 | REG_B)
@@ -156,7 +156,10 @@
 #define OP_LD_ptrnn_A 0xEA
 
 //--------------------------------8bit Arthmetic/logical Commands---------------------
-// add r
+// add A,n
+#define OP_ADD_A_n 0xC6
+
+// add A,(HL)
 #define OP_ADD_A_ptrHL 0x86
 
 // sub r
@@ -167,6 +170,9 @@
 #define OP_SUB_H (0x90 | REG_H)
 #define OP_SUB_L (0x90 | REG_L)
 #define OP_SUB_A (0x90 | REG_A)
+
+// sub A,n
+#define OP_SUB_A_n 0xD6
 
 // and r
 #define OP_AND_B (0xA0 | REG_B)
@@ -188,6 +194,9 @@
 #define OP_XOR_H (0xA8 | REG_H)
 #define OP_XOR_L (0xA8 | REG_L)
 #define OP_XOR_A (0xA8 | REG_A)
+
+// xor (HL)
+#define OP_XOR_ptrHL 0xAE
 
 // or R
 #define OP_OR_B (0xB0 | REG_B)
@@ -212,6 +221,9 @@
 #define OP_INC_H (REG_H << 3 | 4)
 #define OP_INC_L (REG_L << 3 | 4)
 #define OP_INC_A (REG_A << 3 | 4)
+
+// inc (HL)
+#define OP_INC_ptrHL 0x34
 
 // dec r
 #define OP_DEC_B (REG_B << 3 | 5)
@@ -246,7 +258,13 @@
 #define OP_POP_HL (REG_HL << 4 | 0xC1)
 #define OP_POP_AF (REG_AF << 4 | 0xC1)
 
-//--------------------------------16bit Arthmetic Commands----------------------------
+//--------------------------------16bit Arithmetic Commands----------------------------
+// add HL,rr
+#define OP_ADD_HL_BC (REG_BC << 4 | 0x9)
+#define OP_ADD_HL_DE (REG_DE << 4 | 0x9)
+#define OP_ADD_HL_HL (REG_HL << 4 | 0x9)
+#define OP_ADD_HL_SP (REG_SP << 4 | 0x9)
+
 // inc rr
 #define OP_INC_BC (REG_BC << 4 | 0x3)
 #define OP_INC_DE (REG_DE << 4 | 0x3)
@@ -259,9 +277,15 @@
 #define OP_DEC_HL (REG_HL << 4 | 0xB)
 #define OP_DEC_SP (REG_SP << 4 | 0xB)
 
+// add SP,dd
+#define OP_ADD_SP_dd 0xE8
+
 //------------------------------Rotate/Shift Commands---------------------------------
 // rla
 #define OP_RLA 0x17
+
+// rra
+#define OP_RRA 0x1F
 
 // rl r
 #define OP_CB_RL_B (REG_B | 0x10)
@@ -272,6 +296,18 @@
 #define OP_CB_RL_L (REG_L | 0x10)
 #define OP_CB_RL_A (REG_A | 0x10)
 
+// rr r
+#define OP_CB_RR_B (REG_B | 0x18)
+#define OP_CB_RR_C (REG_C | 0x18)
+#define OP_CB_RR_D (REG_D | 0x18)
+#define OP_CB_RR_E (REG_E | 0x18)
+#define OP_CB_RR_H (REG_H | 0x18)
+#define OP_CB_RR_L (REG_L | 0x18)
+#define OP_CB_RR_A (REG_A | 0x18)
+
+// rr (HL)
+#define OP_CB_RR_ptrHL 0x1E
+
 // swap r
 #define OP_CB_SWAP_B (REG_B | 0x30)
 #define OP_CB_SWAP_C (REG_C | 0x30)
@@ -281,17 +317,135 @@
 #define OP_CB_SWAP_L (REG_L | 0x30)
 #define OP_CB_SWAP_A (REG_A | 0x30)
 
+// srl r
+#define OP_CB_SRL_B (REG_B | 0x38)
+#define OP_CB_SRL_C (REG_C | 0x38)
+#define OP_CB_SRL_D (REG_D | 0x38)
+#define OP_CB_SRL_E (REG_E | 0x38)
+#define OP_CB_SRL_H (REG_H | 0x38)
+#define OP_CB_SRL_L (REG_L | 0x38)
+#define OP_CB_SRL_A (REG_A | 0x38)
+
 //------------------------------Single Bit Operation Commands-------------------------
 // bit n,r
-#define OP_CB_BIT_n_B (REG_B | 0x78)
-#define OP_CB_BIT_n_C (REG_C | 0x78)
-#define OP_CB_BIT_n_D (REG_D | 0x78)
-#define OP_CB_BIT_n_E (REG_E | 0x78)
-#define OP_CB_BIT_n_H (REG_H | 0x78)
-#define OP_CB_BIT_n_L (REG_L | 0x78)
-#define OP_CB_BIT_n_A (REG_A | 0x78)
+#define OP_CB_BIT_0_B (REG_B | 0x40)
+#define OP_CB_BIT_1_B (REG_B | 0x48)
+#define OP_CB_BIT_2_B (REG_B | 0x50)
+#define OP_CB_BIT_3_B (REG_B | 0x58)
+#define OP_CB_BIT_4_B (REG_B | 0x60)
+#define OP_CB_BIT_5_B (REG_B | 0x68)
+#define OP_CB_BIT_6_B (REG_B | 0x70)
+#define OP_CB_BIT_7_B (REG_B | 0x78)
+#define OP_CB_BIT_0_C (REG_C | 0x40)
+#define OP_CB_BIT_1_C (REG_C | 0x48)
+#define OP_CB_BIT_2_C (REG_C | 0x50)
+#define OP_CB_BIT_3_C (REG_C | 0x58)
+#define OP_CB_BIT_4_C (REG_C | 0x60)
+#define OP_CB_BIT_5_C (REG_C | 0x68)
+#define OP_CB_BIT_6_C (REG_C | 0x70)
+#define OP_CB_BIT_7_C (REG_C | 0x78)
+#define OP_CB_BIT_0_D (REG_D | 0x40)
+#define OP_CB_BIT_1_D (REG_D | 0x48)
+#define OP_CB_BIT_2_D (REG_D | 0x50)
+#define OP_CB_BIT_3_D (REG_D | 0x58)
+#define OP_CB_BIT_4_D (REG_D | 0x60)
+#define OP_CB_BIT_5_D (REG_D | 0x68)
+#define OP_CB_BIT_6_D (REG_D | 0x70)
+#define OP_CB_BIT_7_D (REG_D | 0x78)
+#define OP_CB_BIT_0_E (REG_E | 0x40)
+#define OP_CB_BIT_1_E (REG_E | 0x48)
+#define OP_CB_BIT_2_E (REG_E | 0x50)
+#define OP_CB_BIT_3_E (REG_E | 0x58)
+#define OP_CB_BIT_4_E (REG_E | 0x60)
+#define OP_CB_BIT_5_E (REG_E | 0x68)
+#define OP_CB_BIT_6_E (REG_E | 0x70)
+#define OP_CB_BIT_7_E (REG_E | 0x78)
+#define OP_CB_BIT_0_H (REG_H | 0x40)
+#define OP_CB_BIT_1_H (REG_H | 0x48)
+#define OP_CB_BIT_2_H (REG_H | 0x50)
+#define OP_CB_BIT_3_H (REG_H | 0x58)
+#define OP_CB_BIT_4_H (REG_H | 0x60)
+#define OP_CB_BIT_5_H (REG_H | 0x68)
+#define OP_CB_BIT_6_H (REG_H | 0x70)
+#define OP_CB_BIT_7_H (REG_H | 0x78)
+#define OP_CB_BIT_0_L (REG_L | 0x40)
+#define OP_CB_BIT_1_L (REG_L | 0x48)
+#define OP_CB_BIT_2_L (REG_L | 0x50)
+#define OP_CB_BIT_3_L (REG_L | 0x58)
+#define OP_CB_BIT_4_L (REG_L | 0x60)
+#define OP_CB_BIT_5_L (REG_L | 0x68)
+#define OP_CB_BIT_6_L (REG_L | 0x70)
+#define OP_CB_BIT_7_L (REG_L | 0x78)
+#define OP_CB_BIT_0_A (REG_A | 0x40)
+#define OP_CB_BIT_1_A (REG_A | 0x48)
+#define OP_CB_BIT_2_A (REG_A | 0x50)
+#define OP_CB_BIT_3_A (REG_A | 0x58)
+#define OP_CB_BIT_4_A (REG_A | 0x60)
+#define OP_CB_BIT_5_A (REG_A | 0x68)
+#define OP_CB_BIT_6_A (REG_A | 0x70)
+#define OP_CB_BIT_7_A (REG_A | 0x78)
+
+// bit n,r
+#define OP_CB_RES_0_B (REG_B | (0x40 + 0x40))
+#define OP_CB_RES_1_B (REG_B | (0x48 + 0x40))
+#define OP_CB_RES_2_B (REG_B | (0x50 + 0x40))
+#define OP_CB_RES_3_B (REG_B | (0x58 + 0x40))
+#define OP_CB_RES_4_B (REG_B | (0x60 + 0x40))
+#define OP_CB_RES_5_B (REG_B | (0x68 + 0x40))
+#define OP_CB_RES_6_B (REG_B | (0x70 + 0x40))
+#define OP_CB_RES_7_B (REG_B | (0x78 + 0x40))
+#define OP_CB_RES_0_C (REG_C | (0x40 + 0x40))
+#define OP_CB_RES_1_C (REG_C | (0x48 + 0x40))
+#define OP_CB_RES_2_C (REG_C | (0x50 + 0x40))
+#define OP_CB_RES_3_C (REG_C | (0x58 + 0x40))
+#define OP_CB_RES_4_C (REG_C | (0x60 + 0x40))
+#define OP_CB_RES_5_C (REG_C | (0x68 + 0x40))
+#define OP_CB_RES_6_C (REG_C | (0x70 + 0x40))
+#define OP_CB_RES_7_C (REG_C | (0x78 + 0x40))
+#define OP_CB_RES_0_D (REG_D | (0x40 + 0x40))
+#define OP_CB_RES_1_D (REG_D | (0x48 + 0x40))
+#define OP_CB_RES_2_D (REG_D | (0x50 + 0x40))
+#define OP_CB_RES_3_D (REG_D | (0x58 + 0x40))
+#define OP_CB_RES_4_D (REG_D | (0x60 + 0x40))
+#define OP_CB_RES_5_D (REG_D | (0x68 + 0x40))
+#define OP_CB_RES_6_D (REG_D | (0x70 + 0x40))
+#define OP_CB_RES_7_D (REG_D | (0x78 + 0x40))
+#define OP_CB_RES_0_E (REG_E | (0x40 + 0x40))
+#define OP_CB_RES_1_E (REG_E | (0x48 + 0x40))
+#define OP_CB_RES_2_E (REG_E | (0x50 + 0x40))
+#define OP_CB_RES_3_E (REG_E | (0x58 + 0x40))
+#define OP_CB_RES_4_E (REG_E | (0x60 + 0x40))
+#define OP_CB_RES_5_E (REG_E | (0x68 + 0x40))
+#define OP_CB_RES_6_E (REG_E | (0x70 + 0x40))
+#define OP_CB_RES_7_E (REG_E | (0x78 + 0x40))
+#define OP_CB_RES_0_H (REG_H | (0x40 + 0x40))
+#define OP_CB_RES_1_H (REG_H | (0x48 + 0x40))
+#define OP_CB_RES_2_H (REG_H | (0x50 + 0x40))
+#define OP_CB_RES_3_H (REG_H | (0x58 + 0x40))
+#define OP_CB_RES_4_H (REG_H | (0x60 + 0x40))
+#define OP_CB_RES_5_H (REG_H | (0x68 + 0x40))
+#define OP_CB_RES_6_H (REG_H | (0x70 + 0x40))
+#define OP_CB_RES_7_H (REG_H | (0x78 + 0x40))
+#define OP_CB_RES_0_L (REG_L | (0x40 + 0x40))
+#define OP_CB_RES_1_L (REG_L | (0x48 + 0x40))
+#define OP_CB_RES_2_L (REG_L | (0x50 + 0x40))
+#define OP_CB_RES_3_L (REG_L | (0x58 + 0x40))
+#define OP_CB_RES_4_L (REG_L | (0x60 + 0x40))
+#define OP_CB_RES_5_L (REG_L | (0x68 + 0x40))
+#define OP_CB_RES_6_L (REG_L | (0x70 + 0x40))
+#define OP_CB_RES_7_L (REG_L | (0x78 + 0x40))
+#define OP_CB_RES_0_A (REG_A | (0x40 + 0x40))
+#define OP_CB_RES_1_A (REG_A | (0x48 + 0x40))
+#define OP_CB_RES_2_A (REG_A | (0x50 + 0x40))
+#define OP_CB_RES_3_A (REG_A | (0x58 + 0x40))
+#define OP_CB_RES_4_A (REG_A | (0x60 + 0x40))
+#define OP_CB_RES_5_A (REG_A | (0x68 + 0x40))
+#define OP_CB_RES_6_A (REG_A | (0x70 + 0x40))
+#define OP_CB_RES_7_A (REG_A | (0x78 + 0x40))
 
 //--------------------------------CPU Control Commands--------------------------------
+#define OP_CCF 0x3F
+#define OP_SCF 0x37
 #define OP_DI 0xF3
 #define OP_EI 0xFB
 
@@ -339,10 +493,10 @@
 #define OP_RETI 0xD9
 
 // rst n
-#define OP_RST_00 (1 << 3 | 0xC7)
-#define OP_RST_08 (2 << 3 | 0xC7)
-#define OP_RST_10 (3 << 3 | 0xC7)
-#define OP_RST_18 (4 << 3 | 0xC7)
-#define OP_RST_20 (5 << 3 | 0xC7)
-#define OP_RST_28 (6 << 3 | 0xC7)
-#define OP_RST_30 (7 << 3 | 0xC7)
+#define OP_RST_00 (0 << 3 | 0xC7)
+#define OP_RST_08 (1 << 3 | 0xC7)
+#define OP_RST_10 (2 << 3 | 0xC7)
+#define OP_RST_18 (3 << 3 | 0xC7)
+#define OP_RST_20 (4 << 3 | 0xC7)
+#define OP_RST_28 (5 << 3 | 0xC7)
+#define OP_RST_30 (6 << 3 | 0xC7)
