@@ -33,6 +33,9 @@
 #define OP_NOP 0x00
 
 //--------------------------------8bit Load Commands--------------------------------
+// ld (nn), SP
+#define OP_LD_ptrnn_SP 0x08
+
 // ld r,r
 #define OP_LD_B_B (REG_B << 3 | REG_B | 0x40)
 #define OP_LD_B_C (REG_B << 3 | REG_C | 0x40)
@@ -156,11 +159,32 @@
 #define OP_LD_ptrnn_A 0xEA
 
 //--------------------------------8bit Arthmetic/logical Commands---------------------
+// add r
+#define OP_ADD_B (0x80 | REG_B)
+#define OP_ADD_C (0x80 | REG_C)
+#define OP_ADD_D (0x80 | REG_D)
+#define OP_ADD_E (0x80 | REG_E)
+#define OP_ADD_H (0x80 | REG_H)
+#define OP_ADD_L (0x80 | REG_L)
+#define OP_ADD_A (0x80 | REG_A)
+
 // add A,n
 #define OP_ADD_A_n 0xC6
 
 // add A,(HL)
 #define OP_ADD_A_ptrHL 0x86
+
+// adc r
+#define OP_ADC_B (0x88 | REG_B)
+#define OP_ADC_C (0x88 | REG_C)
+#define OP_ADC_D (0x88 | REG_D)
+#define OP_ADC_E (0x88 | REG_E)
+#define OP_ADC_H (0x88 | REG_H)
+#define OP_ADC_L (0x88 | REG_L)
+#define OP_ADC_A (0x88 | REG_A)
+
+// adc A,(HL)
+#define OP_ADC_A_ptrHL 0x8E
 
 // sub r
 #define OP_SUB_B (0x90 | REG_B)
@@ -173,6 +197,18 @@
 
 // sub A,n
 #define OP_SUB_A_n 0xD6
+
+// sbc A,r
+#define OP_SBC_B (0x98 | REG_B)
+#define OP_SBC_C (0x98 | REG_C)
+#define OP_SBC_D (0x98 | REG_D)
+#define OP_SBC_E (0x98 | REG_E)
+#define OP_SBC_H (0x98 | REG_H)
+#define OP_SBC_L (0x98 | REG_L)
+#define OP_SBC_A (0x98 | REG_A)
+
+// sbc A,(HL)
+#define OP_SBC_ptrHL 0x9E
 
 // and r
 #define OP_AND_B (0xA0 | REG_B)
@@ -198,7 +234,7 @@
 // xor (HL)
 #define OP_XOR_ptrHL 0xAE
 
-// or R
+// or r
 #define OP_OR_B (0xB0 | REG_B)
 #define OP_OR_C (0xB0 | REG_C)
 #define OP_OR_D (0xB0 | REG_D)
@@ -206,6 +242,21 @@
 #define OP_OR_H (0xB0 | REG_H)
 #define OP_OR_L (0xB0 | REG_L)
 #define OP_OR_A (0xB0 | REG_A)
+
+// or n
+#define OP_OR_n 0xF6
+
+// or A, (HL)
+#define OP_OR_ptrHL 0xB6
+
+// cp r
+#define OP_CP_B (0xB8 | REG_B)
+#define OP_CP_C (0xB8 | REG_C)
+#define OP_CP_D (0xB8 | REG_D)
+#define OP_CP_E (0xB8 | REG_E)
+#define OP_CP_H (0xB8 | REG_H)
+#define OP_CP_L (0xB8 | REG_L)
+#define OP_CP_A (0xB8 | REG_A)
 
 // cp n
 #define OP_CP_n 0xFE
@@ -233,6 +284,12 @@
 #define OP_DEC_H (REG_H << 3 | 5)
 #define OP_DEC_L (REG_L << 3 | 5)
 #define OP_DEC_A (REG_A << 3 | 5)
+
+// dec (HL)
+#define OP_DEC_ptrHL 0x35
+
+// daa
+#define OP_DAA 0x27
 
 // cpl
 #define OP_CPL 0x2F
@@ -281,6 +338,9 @@
 #define OP_ADD_SP_dd 0xE8
 
 //------------------------------Rotate/Shift Commands---------------------------------
+// rlca
+#define OP_RLCA 0x07
+
 // rla
 #define OP_RLA 0x17
 
@@ -307,6 +367,15 @@
 
 // rr (HL)
 #define OP_CB_RR_ptrHL 0x1E
+
+// sla r
+#define OP_CB_SLA_B (REG_B | 0x20)
+#define OP_CB_SLA_C (REG_C | 0x20)
+#define OP_CB_SLA_D (REG_D | 0x20)
+#define OP_CB_SLA_E (REG_E | 0x20)
+#define OP_CB_SLA_H (REG_H | 0x20)
+#define OP_CB_SLA_L (REG_L | 0x20)
+#define OP_CB_SLA_A (REG_A | 0x20)
 
 // swap r
 #define OP_CB_SWAP_B (REG_B | 0x30)
@@ -446,6 +515,8 @@
 //--------------------------------CPU Control Commands--------------------------------
 #define OP_CCF 0x3F
 #define OP_SCF 0x37
+#define OP_HALT 0x76
+#define OP_STOP 0x10
 #define OP_DI 0xF3
 #define OP_EI 0xFB
 
@@ -500,3 +571,4 @@
 #define OP_RST_20 (4 << 3 | 0xC7)
 #define OP_RST_28 (5 << 3 | 0xC7)
 #define OP_RST_30 (6 << 3 | 0xC7)
+#define OP_RST_38 (7 << 3 | 0xC7)
