@@ -1,19 +1,19 @@
 // GB.h - Main structure for the GameBoy
 
+#include "GBOpcodes.h"
+
+#include <assert.h>
+#include <memory.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <memory.h>
-#include <assert.h>
 
 #ifdef WIN32
 #include <SDL2/SDL.h>
 #elif __APPLE__
 #include <SDL.h>
 #endif
-
-#include "GBOpcodes.h"
 
 #define GB_VID_WIDTH 160
 #define GB_VID_HEIGHT 144
@@ -35,32 +35,39 @@
 #define CART_GLOBAL_CHECKSUM 0x14E
 #define CART_GLOBAL_CHECKSUM_END 0x14F
 
-#define instr(opcode, val, name) \
-    else if (opcode == val)
+#define instr(opcode, val, name) else if (opcode == val)
 
-#define instr_ld_r_r(opcode, base, shift, name) \
-    else if ((opcode & base) == base && ((opcode >> shift & 0b111) <= 7 && (opcode >> shift & 0b111) != 6) && ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
+#define instr_ld_r_r(opcode, base, shift, name)  \
+    else if ((opcode & base) == base &&          \
+             ((opcode >> shift & 0b111) <= 7 &&  \
+              (opcode >> shift & 0b111) != 6) && \
+             ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
 
-#define instr_bit(opcode, name) \
-    else if ((opcode & 0x40) == 0x40 && (opcode >> 3 & 0b111) >= 0x8 && (opcode >> 3 & 0b111) < 0xF && ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
+#define instr_bit(opcode, name)                                         \
+    else if ((opcode & 0x40) == 0x40 && (opcode >> 3 & 0b111) >= 0x8 && \
+             (opcode >> 3 & 0b111) < 0xF &&                             \
+             ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
 
-#define instr_res_bit(opcode, name) \
-    else if ((opcode & 0x0) == 0x80 && (opcode >> 3 & 0b111) >= 0x8 && (opcode >> 3 & 0b111) < 0xF && ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
+#define instr_res_bit(opcode, name)                                    \
+    else if ((opcode & 0x0) == 0x80 && (opcode >> 3 & 0b111) >= 0x8 && \
+             (opcode >> 3 & 0b111) < 0xF &&                            \
+             ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
 
 #define instr_rst(opcode, name) \
     else if ((opcode & 0xC7) == 0xC7 && ((opcode & 0b111) <= 7))
 
-#define instr_left_r(opcode, base, shift, name) \
-    else if ((opcode & base) == base && ((opcode >> shift & 0b111) <= 7 && (opcode >> shift & 0b111) != 6))
+#define instr_left_r(opcode, base, shift, name)                            \
+    else if ((opcode & base) == base && ((opcode >> shift & 0b111) <= 7 && \
+                                         (opcode >> shift & 0b111) != 6))
 
 #define instr_left_f(opcode, base, shift, name) \
     else if ((opcode & base) == base && ((opcode >> shift & 0b11) <= 3))
 
 #define instr_right_r(opcode, base, name) \
-    else if ((opcode & base) == base && ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
+    else if ((opcode & base) == base &&   \
+             ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
 
-#define instr_invalid() \
-    else
+#define instr_invalid() else
 
 // 0xFF40 - LCD Control Register
 // Bit 7 - LCD Power           (0=Off, 1=On)
@@ -73,13 +80,13 @@
 // Bit 0 - BG Enabled (in DMG) (0=Disabled, 1=Enabled)
 typedef struct RenderContextstruct
 {
-    SDL_Window *window;
+    SDL_Window *  window;
     SDL_Renderer *renderer;
 
     SDL_Texture *backbufferTexture;
 
     uint32_t *pixels;
-    int pitch;
+    int       pitch;
 } RenderContext;
 
 // CPU Opcode information (Found on Page 65)
@@ -128,7 +135,7 @@ void DestroyGBRenderContext(RenderContext *ctx)
         {
             SDL_DestroyRenderer(ctx->renderer);
             ctx->renderer = NULL;
-            ctx->pixels = NULL;
+            ctx->pixels   = NULL;
         }
         if (ctx->window != NULL)
         {
@@ -168,12 +175,8 @@ RenderContext *CreateRenderContext()
     RenderContext *ctx = malloc(sizeof(RenderContext));
 
     ctx->window = SDL_CreateWindow(
-        "pc_gb",
-        -1080,
-        SDL_WINDOWPOS_CENTERED,
-        GB_VID_WIDTH * RENDER_SCALE,
-        GB_VID_HEIGHT * RENDER_SCALE,
-        SDL_WINDOW_SHOWN);
+        "pc_gb", -1080, SDL_WINDOWPOS_CENTERED, GB_VID_WIDTH * RENDER_SCALE,
+        GB_VID_HEIGHT * RENDER_SCALE, SDL_WINDOW_SHOWN);
 
     if (ctx->window == NULL)
     {
@@ -181,7 +184,8 @@ RenderContext *CreateRenderContext()
         return NULL;
     }
 
-    ctx->renderer = SDL_CreateRenderer(ctx->window, -1, SDL_RENDERER_ACCELERATED);
+    ctx->renderer =
+        SDL_CreateRenderer(ctx->window, -1, SDL_RENDERER_ACCELERATED);
     if (ctx->renderer == NULL)
     {
         DestroyGBRenderContext(ctx);
@@ -189,18 +193,16 @@ RenderContext *CreateRenderContext()
     }
 
     ctx->backbufferTexture = SDL_CreateTexture(
-        ctx->renderer,
-        SDL_PIXELFORMAT_RGBA8888,
-        SDL_TEXTUREACCESS_STREAMING,
-        GB_VID_WIDTH * RENDER_SCALE,
-        GB_VID_HEIGHT * RENDER_SCALE);
+        ctx->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING,
+        GB_VID_WIDTH * RENDER_SCALE, GB_VID_HEIGHT * RENDER_SCALE);
     if (ctx->backbufferTexture == NULL)
     {
         DestroyGBRenderContext(ctx);
         return NULL;
     }
 
-    ctx->pixels = malloc(sizeof(uint32_t) * GB_VID_WIDTH * GB_VID_HEIGHT * RENDER_SCALE * RENDER_SCALE);
+    ctx->pixels = malloc(sizeof(uint32_t) * GB_VID_WIDTH * GB_VID_HEIGHT *
+                         RENDER_SCALE * RENDER_SCALE);
     if (ctx->pixels == NULL)
     {
         DestroyGBRenderContext(ctx);
@@ -221,7 +223,7 @@ GB *CreateGB(const char *rom)
         return NULL;
     }
 
-    GB *gb = malloc(sizeof(GB));
+    GB *gb  = malloc(sizeof(GB));
     gb->ctx = ctx;
 
     return gb;
@@ -251,7 +253,7 @@ uint8_t ReadMem(GB *gb, uint16_t addr)
     return 0;
 }
 
-void WriteMem(GB *gb, uint16_t addr, uint8_t val)
+void WriteMemRomOnly(GB *gb, uint16_t addr, uint8_t val)
 {
     if (addr >= 0x8000)
     {
@@ -264,16 +266,103 @@ void WriteMem(GB *gb, uint16_t addr, uint8_t val)
             gb->mem[addr - 0x8000] = val;
         }
     }
-    else if (addr >= 0x2000 && addr <= 0x3FFF)
+}
+
+void WriteMemMBC1(GB *gb, uint16_t addr, uint8_t val)
+{
+    printf("Not Implemented!\n");
+    assert(false);
+}
+
+void WriteMemMBC1Ram(GB *gb, uint16_t addr, uint8_t val)
+{
+    printf("Not Implemented!\n");
+    assert(false);
+}
+
+void WriteMemMBC1RamBat(GB *gb, uint16_t addr, uint8_t val)
+{
+    printf("Not Implemented!\n");
+    assert(false);
+}
+
+void WriteMemMBC2(GB *gb, uint16_t addr, uint8_t val)
+{
+    printf("Not Implemented!\n");
+    assert(false);
+}
+
+void WriteMemMBC2Bat(GB *gb, uint16_t addr, uint8_t val)
+{
+    printf("Not Implemented!\n");
+    assert(false);
+}
+
+void WriteMem(GB *gb, uint16_t addr, uint8_t val)
+{
+    switch (gb->cart[CART_CART_TYPE])
     {
-        if (val == 0)
-            val = 1;
-        gb->mem[0x2000] = val & 0b11111;
+        case CART_TYPE_ROM_ONLY:
+        {
+            WriteMemRomOnly(gb, addr, val);
+        }
+        break;
+
+        case CART_TYPE_MBC1:
+        {
+            WriteMemMBC1(gb, addr, val);
+        }
+        break;
+
+        case CART_TYPE_MBC1_RAM:
+        {
+            WriteMemMBC1Ram(gb, addr, val);
+        }
+        break;
+
+        case CART_TYPE_MBC1_RAM_BATTERY:
+        {
+            WriteMemMBC1RamBat(gb, addr, val);
+        }
+        break;
+
+        case CART_TYPE_MBC2:
+        {
+            WriteMemMBC2(gb, addr, val);
+        }
+        break;
+
+        case CART_TYPE_MBC2_BATTERY:
+        {
+            WriteMemMBC2Bat(gb, addr, val);
+        }
+        break;
+
+        default:
+            return;
     }
-    else if (addr >= 0x4000 && addr <= 0x5FFF)
-    {
-        gb->mem[0x2000] = (val & 0b11) << 5;
-    }
+
+    // if (addr >= 0x8000)
+    // {
+    //     if (addr == 0xFF44)
+    //     {
+    //         gb->mem[addr - 0x8000] = 0;
+    //     }
+    //     else
+    //     {
+    //         gb->mem[addr - 0x8000] = val;
+    //     }
+    // }
+    // else if (addr >= 0x2000 && addr <= 0x3FFF)
+    // {
+    //     if (val == 0)
+    //         val = 1;
+    //     gb->mem[0x2000] = val & 0b11111;
+    // }
+    // else if (addr >= 0x4000 && addr <= 0x5FFF)
+    // {
+    //     gb->mem[0x2000] = (val & 0b11) << 5;
+    // }
 }
 
 uint8_t *LoadRom(const char *filename, uint32_t *romSize)
@@ -319,11 +408,8 @@ void DumpRomInfo(GB *gb)
 
 void SimpleRender(GB *gb, RenderContext *ctx)
 {
-    SDL_LockTexture(
-        ctx->backbufferTexture,
-        NULL,
-        (void **)(&ctx->pixels),
-        &ctx->pitch);
+    SDL_LockTexture(ctx->backbufferTexture, NULL, (void **)(&ctx->pixels),
+                    &ctx->pitch);
 
     // Get Color shades
     uint32_t colors[4] = {
@@ -342,7 +428,7 @@ void SimpleRender(GB *gb, RenderContext *ctx)
     uint8_t lcdControl = ReadMem(gb, 0xFF40);
 
     uint16_t tileBase = (lcdControl & 0x10) > 0 ? 0x8000 : 0x8800;
-    uint16_t bgBase = (lcdControl & 0x8) > 0 ? 0x9C00 : 0x9800;
+    uint16_t bgBase   = (lcdControl & 0x8) > 0 ? 0x9C00 : 0x9800;
     for (int i = 0; i < 32; ++i)
     {
         for (int j = 0; j < 32; ++j)
@@ -383,7 +469,8 @@ void SimpleRender(GB *gb, RenderContext *ctx)
                     int px = (i * 8 + tx) * RENDER_SCALE;
                     int py = (j * 8 + ty) * RENDER_SCALE;
 
-                    if (px >= GB_VID_WIDTH * RENDER_SCALE || py >= GB_VID_HEIGHT * RENDER_SCALE)
+                    if (px >= GB_VID_WIDTH * RENDER_SCALE ||
+                        py >= GB_VID_HEIGHT * RENDER_SCALE)
                         continue;
 
                     // 5*3 = 15
@@ -397,19 +484,27 @@ void SimpleRender(GB *gb, RenderContext *ctx)
                         {
                             if (color == 0)
                             {
-                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = color0;
+                                ctx->pixels[px + scalex +
+                                            (py + scaley) * GB_VID_WIDTH *
+                                                RENDER_SCALE] = color0;
                             }
                             else if (color == 1)
                             {
-                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = color1;
+                                ctx->pixels[px + scalex +
+                                            (py + scaley) * GB_VID_WIDTH *
+                                                RENDER_SCALE] = color1;
                             }
                             else if (color == 2)
                             {
-                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = color2;
+                                ctx->pixels[px + scalex +
+                                            (py + scaley) * GB_VID_WIDTH *
+                                                RENDER_SCALE] = color2;
                             }
                             else if (color == 3)
                             {
-                                ctx->pixels[px + scalex + (py + scaley) * GB_VID_WIDTH * RENDER_SCALE] = color3;
+                                ctx->pixels[px + scalex +
+                                            (py + scaley) * GB_VID_WIDTH *
+                                                RENDER_SCALE] = color3;
                             }
                         }
                     }
@@ -439,9 +534,9 @@ void Set8Reg(GB *gb, uint8_t reg, uint8_t val)
 {
     assert(reg != 6 && reg <= 7);
 
-    size_t index = reg == REG_A ? 7 : reg / 2;
+    size_t   index  = reg == REG_A ? 7 : reg / 2;
     uint16_t bigVal = val;
-    uint16_t mask = 0xFF00;
+    uint16_t mask   = 0xFF00;
     if (reg % 2 == 0 || reg == REG_A)
     {
         bigVal <<= 8;
@@ -456,8 +551,8 @@ uint8_t Get8Reg(GB *gb, uint8_t reg)
 {
     assert(reg != 6 && reg <= 7);
 
-    size_t index = reg == REG_A ? 7 : reg / 2;
-    uint16_t val = gb->regs[index];
+    size_t   index = reg == REG_A ? 7 : reg / 2;
+    uint16_t val   = gb->regs[index];
     if ((reg % 2) == 0 || reg == REG_A)
     {
         val >>= 8;
@@ -470,28 +565,28 @@ char *GetReg8Name(uint8_t reg)
 {
     switch (reg)
     {
-    case REG_B:
-        return "B";
+        case REG_B:
+            return "B";
 
-    case REG_C:
-        return "C";
+        case REG_C:
+            return "C";
 
-    case REG_D:
-        return "D";
+        case REG_D:
+            return "D";
 
-    case REG_E:
-        return "E";
+        case REG_E:
+            return "E";
 
-    case REG_H:
-        return "H";
+        case REG_H:
+            return "H";
 
-    case REG_L:
-        return "L";
+        case REG_L:
+            return "L";
 
-    case REG_A:
-        return "A";
-    default:
-        assert(false);
+        case REG_A:
+            return "A";
+        default:
+            assert(false);
     }
 }
 
@@ -499,23 +594,23 @@ char *GetRegName(uint8_t reg)
 {
     switch (reg)
     {
-    case REG_BC:
-        return "BC";
+        case REG_BC:
+            return "BC";
 
-    case REG_DE:
-        return "DE";
+        case REG_DE:
+            return "DE";
 
-    case REG_HL:
-        return "HL";
+        case REG_HL:
+            return "HL";
 
-    case REG_SP:
-        return "SP";
+        case REG_SP:
+            return "SP";
 
-    case REG_AF:
-        return "A(F)";
+        case REG_AF:
+            return "A(F)";
 
-    default:
-        assert(false);
+        default:
+            assert(false);
     }
 }
 
@@ -523,20 +618,20 @@ char *GetFlagName(uint8_t flag)
 {
     switch (flag)
     {
-    case FLAG_NZ:
-        return "NZ";
+        case FLAG_NZ:
+            return "NZ";
 
-    case FLAG_Z:
-        return "Z";
+        case FLAG_Z:
+            return "Z";
 
-    case FLAG_NC:
-        return "NC";
+        case FLAG_NC:
+            return "NC";
 
-    case FLAG_C:
-        return "C";
+        case FLAG_C:
+            return "C";
 
-    default:
-        assert(false);
+        default:
+            assert(false);
     }
 }
 
@@ -546,33 +641,33 @@ void SetFlag(GB *gb, uint8_t flag, uint8_t val)
 
     switch (flag)
     {
-    case FLAG_Z:
-    {
-        mask <<= 7;
-    }
-    break;
+        case FLAG_Z:
+        {
+            mask <<= 7;
+        }
+        break;
 
-    case FLAG_C:
-    {
-        mask <<= 4;
-    }
-    break;
+        case FLAG_C:
+        {
+            mask <<= 4;
+        }
+        break;
 
-    case FLAG_N:
-    {
-        mask <<= 6;
-    }
-    break;
+        case FLAG_N:
+        {
+            mask <<= 6;
+        }
+        break;
 
-    case FLAG_H:
-    {
-        mask <<= 5;
-    }
-    break;
+        case FLAG_H:
+        {
+            mask <<= 5;
+        }
+        break;
 
-    default:
-        assert(false);
-        return;
+        default:
+            assert(false);
+            return;
     }
 
     if (val > 0)
@@ -589,40 +684,41 @@ bool CheckFlag(GB *gb, uint8_t flag)
 {
     switch (flag)
     {
-    case FLAG_NZ:
-    {
-        return (gb->regs[REG_AF] & 0x80) == 0;
-    }
-    break;
+        case FLAG_NZ:
+        {
+            return (gb->regs[REG_AF] & 0x80) == 0;
+        }
+        break;
 
-    case FLAG_Z:
-    {
-        return (gb->regs[REG_AF] & 0x80) > 0;
-    }
-    break;
+        case FLAG_Z:
+        {
+            return (gb->regs[REG_AF] & 0x80) > 0;
+        }
+        break;
 
-    case FLAG_NC:
-    {
-        return (gb->regs[REG_AF] & 0x8) == 0;
-    }
-    break;
+        case FLAG_NC:
+        {
+            return (gb->regs[REG_AF] & 0x8) == 0;
+        }
+        break;
 
-    case FLAG_C:
-    {
-        return (gb->regs[REG_AF] & 0x8) >= 0;
-    }
-    break;
+        case FLAG_C:
+        {
+            return (gb->regs[REG_AF] & 0x8) >= 0;
+        }
+        break;
 
-    default:
-        printf("Checking flag that doesn't not exist. This should not have been called!\n");
-        assert(false);
+        default:
+            printf("Checking flag that doesn't not exist. This should not have "
+                   "been called!\n");
+            assert(false);
     }
 }
 
 bool CheckInterrupt(GB *gb, uint8_t mask)
 {
     uint8_t ienable = ReadMem(gb, 0xFFFF);
-    uint8_t iflag = ReadMem(gb, 0xFF0F);
+    uint8_t iflag   = ReadMem(gb, 0xFF0F);
 
     if (gb->IME && (ienable & mask) > 0 && (iflag & mask) > 0)
     {
@@ -643,7 +739,6 @@ void Push16(GB *gb, uint16_t val)
 
 void CallInterrupt(GB *gb, uint8_t vector)
 {
-
     Push16(gb, gb->regs[REG_PC]);
     gb->regs[REG_PC] = vector;
 
@@ -722,7 +817,7 @@ bool DoCBInstruction(GB *gb, uint16_t instrPC)
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, reg);
-        uint8_t lo = val & 0xF;
+        uint8_t lo  = val & 0xF;
 
         val = (val >> 4) | (lo << 4);
 
@@ -760,7 +855,8 @@ bool DoCBInstruction(GB *gb, uint16_t instrPC)
     instr_invalid()
     {
         DumpCPURegisters(gb);
-        printf("PC: $%02X: Unknown CB-prefixed instruction: 0x%01X\n", instrPC, opcode);
+        printf("PC: $%02X: Unknown CB-prefixed instruction: 0x%01X\n", instrPC,
+               opcode);
         return false;
     }
 
@@ -770,7 +866,7 @@ bool DoCBInstruction(GB *gb, uint16_t instrPC)
 bool DoInstruction(GB *gb)
 {
     const uint16_t instrPC = gb->regs[REG_PC];
-    uint8_t opcode = FetchByte(gb);
+    uint8_t        opcode  = FetchByte(gb);
 
     if (opcode == 0xCB)
     {
@@ -781,7 +877,7 @@ bool DoInstruction(GB *gb)
     {
     }
 
-    //------------------------------8 bit Load Commands------------------------------
+    //-------------8 bit Load Commands-------------
     instr(opcode, 0x08, "ld (nn), sp")
     {
         uint8_t addr = FetchWord(gb);
@@ -801,7 +897,7 @@ bool DoInstruction(GB *gb)
     instr_left_r(opcode, 0x6, 3, "ld r,n")
     {
         uint8_t regDst = (opcode >> 3) & 0b111;
-        uint8_t val = FetchByte(gb);
+        uint8_t val    = FetchByte(gb);
 
         Set8Reg(gb, regDst, val);
     }
@@ -892,7 +988,7 @@ bool DoInstruction(GB *gb)
     instr(opcode, 0xFA, "ld a,(nn)")
     {
         uint8_t addr = FetchWord(gb);
-        uint8_t val = ReadMem(gb, addr);
+        uint8_t val  = ReadMem(gb, addr);
 
         Set8Reg(gb, REG_A, val);
     }
@@ -910,7 +1006,7 @@ bool DoInstruction(GB *gb)
         WriteMem(gb, addr, Get8Reg(gb, REG_A));
     }
 
-    //------------------------------8 bit Arthimetic/Logical Commands------------------------------
+    //-------------8 bit Arthimetic/Logical Commands-------------
     instr_right_r(opcode, 0x80, "add a,r")
     {
         uint8_t reg = opcode & 0b111;
@@ -926,7 +1022,7 @@ bool DoInstruction(GB *gb)
 
     instr(opcode, 0xC6, "add a,n")
     {
-        uint8_t val = FetchByte(gb);
+        uint8_t val    = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) + val;
 
         SetFlag(gb, FLAG_Z, newVal == 0);
@@ -940,7 +1036,8 @@ bool DoInstruction(GB *gb)
     instr_right_r(opcode, 0x88, "adc a,r")
     {
         uint8_t reg = opcode & 0b111;
-        uint8_t val = Get8Reg(gb, REG_A) + Get8Reg(gb, reg) + (gb->regs[REG_AF] & 0x8 >> 3);
+        uint8_t val = Get8Reg(gb, REG_A) + Get8Reg(gb, reg) +
+                      (gb->regs[REG_AF] & 0x8 >> 3);
 
         SetFlag(gb, FLAG_Z, val == 0);
         SetFlag(gb, FLAG_C, val < Get8Reg(gb, REG_A));
@@ -952,7 +1049,7 @@ bool DoInstruction(GB *gb)
 
     instr(opcode, 0x86, "add a,(hl)")
     {
-        uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
+        uint8_t val    = ReadMem(gb, gb->regs[REG_HL]);
         uint8_t newVal = Get8Reg(gb, REG_A) + val;
 
         SetFlag(gb, FLAG_Z, newVal == 0);
@@ -966,7 +1063,8 @@ bool DoInstruction(GB *gb)
     instr(opcode, 0x8E, "adc a,(hl)")
     {
         uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
-        uint8_t newVal = Get8Reg(gb, REG_A) + val + (gb->regs[REG_AF] & 0x8 >> 3);
+        uint8_t newVal =
+            Get8Reg(gb, REG_A) + val + (gb->regs[REG_AF] & 0x8 >> 3);
 
         SetFlag(gb, FLAG_Z, newVal == 0);
         SetFlag(gb, FLAG_C, newVal < Get8Reg(gb, REG_A));
@@ -991,7 +1089,7 @@ bool DoInstruction(GB *gb)
 
     instr(opcode, 0xD6, "sub a,n")
     {
-        uint8_t val = FetchByte(gb);
+        uint8_t val    = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) - val;
 
         SetFlag(gb, FLAG_Z, newVal == 0);
@@ -1005,7 +1103,8 @@ bool DoInstruction(GB *gb)
     instr_right_r(opcode, 0x98, "sbc a,r")
     {
         uint8_t reg = opcode & 0b111;
-        uint8_t val = Get8Reg(gb, REG_A) - Get8Reg(gb, reg) - (gb->regs[REG_AF] & 0x8 >> 3);
+        uint8_t val = Get8Reg(gb, REG_A) - Get8Reg(gb, reg) -
+                      (gb->regs[REG_AF] & 0x8 >> 3);
 
         SetFlag(gb, FLAG_Z, val == 0);
         SetFlag(gb, FLAG_C, val > Get8Reg(gb, REG_A));
@@ -1018,7 +1117,8 @@ bool DoInstruction(GB *gb)
     instr(opcode, 0x9E, "sbc a,(hl)")
     {
         uint8_t reg = opcode & 0b111;
-        uint8_t val = Get8Reg(gb, REG_A) - ReadMem(gb, gb->regs[REG_HL]) - (gb->regs[REG_AF] & 0x8 >> 3);
+        uint8_t val = Get8Reg(gb, REG_A) - ReadMem(gb, gb->regs[REG_HL]) -
+                      (gb->regs[REG_AF] & 0x8 >> 3);
 
         SetFlag(gb, FLAG_Z, val == 0);
         SetFlag(gb, FLAG_C, val > Get8Reg(gb, REG_A));
@@ -1042,7 +1142,7 @@ bool DoInstruction(GB *gb)
 
     instr(opcode, 0xE6, "and a,n")
     {
-        uint8_t val = FetchByte(gb);
+        uint8_t val    = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) & val;
         Set8Reg(gb, REG_A, newVal);
 
@@ -1054,7 +1154,7 @@ bool DoInstruction(GB *gb)
 
     instr(opcode, 0xF6, "or a,n")
     {
-        uint8_t val = FetchByte(gb);
+        uint8_t val    = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) | val;
         Set8Reg(gb, REG_A, newVal);
 
@@ -1121,7 +1221,7 @@ bool DoInstruction(GB *gb)
 
     instr(opcode, 0xFE, "cp a,n")
     {
-        uint8_t val = FetchByte(gb);
+        uint8_t val    = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) - val;
 
         SetFlag(gb, FLAG_Z, newVal == 0);
@@ -1132,7 +1232,7 @@ bool DoInstruction(GB *gb)
 
     instr(opcode, 0xBE, "cp a,(hl)")
     {
-        uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
+        uint8_t val    = ReadMem(gb, gb->regs[REG_HL]);
         uint8_t newVal = Get8Reg(gb, REG_A) - val;
 
         SetFlag(gb, FLAG_Z, newVal == 0);
@@ -1156,7 +1256,7 @@ bool DoInstruction(GB *gb)
     instr(opcode, 0x34, "inc (hl)")
     {
         uint8_t data = ReadMem(gb, gb->regs[REG_HL]);
-        uint8_t val = data + 1;
+        uint8_t val  = data + 1;
 
         SetFlag(gb, FLAG_Z, val == 0);
         SetFlag(gb, FLAG_N, 0);
@@ -1180,7 +1280,7 @@ bool DoInstruction(GB *gb)
     instr(opcode, 0x35, "dec (hl)")
     {
         uint8_t data = ReadMem(gb, gb->regs[REG_HL]);
-        uint8_t val = data - 1;
+        uint8_t val  = data - 1;
 
         SetFlag(gb, FLAG_Z, val == 0);
         SetFlag(gb, FLAG_N, 1);
@@ -1236,10 +1336,10 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, 1);
     }
 
-    //------------------------------16 bit Load/Arithmetic/Logical Commands------------------------------
+    //-------------16 bit Load/Arithmetic/Logical Commands-------------
     instr_left_r(opcode, 0x01, 4, "ld rr, nn")
     {
-        uint8_t reg = (opcode & 0xF0) >> 4;
+        uint8_t  reg = (opcode & 0xF0) >> 4;
         uint16_t val = FetchWord(gb);
 
         gb->regs[reg] = val;
@@ -1253,13 +1353,13 @@ bool DoInstruction(GB *gb)
 
     instr_left_r(opcode, 0xC1, 4, "pop rr")
     {
-        uint8_t reg = (opcode >> 4) & 0b11;
+        uint8_t reg   = (opcode >> 4) & 0b11;
         gb->regs[reg] = Pop16(gb);
     }
 
     instr_left_r(opcode, 0x09, 4, "add hl, rr")
     {
-        uint8_t reg = (opcode >> 4) & 0b11;
+        uint8_t reg    = (opcode >> 4) & 0b11;
         uint8_t newVal = gb->regs[REG_HL] + gb->regs[reg];
 
         SetFlag(gb, FLAG_C, newVal < gb->regs[REG_HL]);
@@ -1285,7 +1385,7 @@ bool DoInstruction(GB *gb)
 
     instr(opcode, 0xE8, "add sp, dd")
     {
-        uint8_t val = FetchByte(gb);
+        uint8_t val    = FetchByte(gb);
         uint8_t newVal = gb->regs[REG_SP];
 
         if ((val & 0x80) > 0)
@@ -1309,7 +1409,7 @@ bool DoInstruction(GB *gb)
         gb->regs[REG_SP] = newVal;
     }
 
-    //------------------------------Rotate/Shift Commands------------------------------
+    //-------------Rotate/Shift Commands-------------
     instr(opcode, 0x07, "rlca")
     {
         uint8_t val = Get8Reg(gb, REG_A);
@@ -1356,7 +1456,7 @@ bool DoInstruction(GB *gb)
         Set8Reg(gb, REG_A, val);
     }
 
-    //------------------------------CPU Control Commands------------------------------
+    //-------------CPU Control Commands-------------
     instr(opcode, 0x3F, "ccf")
     {
         SetFlag(gb, FLAG_C, 0);
@@ -1388,7 +1488,7 @@ bool DoInstruction(GB *gb)
         gb->IME = true;
     }
 
-    //------------------------------Jump Commands------------------------------
+    //-------------Jump Commands-------------
     instr(opcode, 0xC3, "jp nn")
     {
         uint16_t addr = FetchWord(gb);
@@ -1403,7 +1503,7 @@ bool DoInstruction(GB *gb)
         gb->regs[REG_PC] = addr;
     }
 
-    instr_left_r(opcode, 0xC2, 3, "jp f,nn")
+    instr_left_f(opcode, 0xC2, 3, "jp f,nn")
     {
         uint8_t addr = FetchWord(gb);
         uint8_t flag = (opcode >> 3) & 0b11;
@@ -1418,11 +1518,10 @@ bool DoInstruction(GB *gb)
         }
     }
 
-    instr_left_r(opcode, 0x20, 3, "jp f,dd")
+    instr_left_f(opcode, 0x20, 3, "jp f,dd")
     {
-
         uint8_t offset = FetchByte(gb);
-        uint8_t flag = (opcode >> 3) & 0b11;
+        uint8_t flag   = (opcode >> 3) & 0b11;
 
         if (CheckFlag(gb, flag))
         {
@@ -1471,7 +1570,7 @@ bool DoInstruction(GB *gb)
 
     instr_left_r(opcode, 0xC4, 3, "call f,nn")
     {
-        uint8_t flag = opcode >> 3 & 0b111;
+        uint8_t  flag = opcode >> 3 & 0b111;
         uint16_t addr = FetchWord(gb);
 
         if (CheckFlag(gb, flag))
@@ -1501,7 +1600,7 @@ bool DoInstruction(GB *gb)
     instr(opcode, 0xD9, "reti")
     {
         gb->regs[REG_PC] = Pop16(gb);
-        gb->IME = true;
+        gb->IME          = true;
     }
 
     instr_rst(opcode, "rst n")
@@ -1521,7 +1620,7 @@ bool DoInstruction(GB *gb)
     return true;
 }
 
-void StartGB(GB *gb)
+void StartGB(GB *gb, const char *rom)
 {
     if (gb == NULL)
     {
@@ -1531,19 +1630,13 @@ void StartGB(GB *gb)
     printf("GB Starting...\n");
 
     uint8_t bootstrapROMSize = 0;
-    gb->bootRom = LoadRom("../tests/carts/DMG_ROM.bin", &gb->bootRomSize);
+    gb->bootRom              = LoadRom("DMG_ROM.bin", &gb->bootRomSize);
     if (gb->bootRom == NULL)
     {
         return;
     }
 
-    gb->cart = LoadRom("../tests/carts/cpu_instrs/cpu_instrs.gb", &gb->cartSize);
-    // gb->cart = LoadRom("../tests/carts/cpu_instrs/individual/06-ld r,r.gb", &gb->cartSize);
-    // gb->cart = LoadRom("../tests/carts/Tetris (JUE) (V1.1) [!].gb", &gb->cartSize);
-    // gb->cart = LoadRom("../tests/carts/Dr. Mario (JU) (V1.1).gb", &gb->cartSize);
-    // gb->cart = LoadRom("../tests/carts/Cadillac II (J).gb", &gb->cartSize);
-    // gb->cart = LoadRom("../tests/carts/Legend of Zelda, The - Link's Awakening (U) (V1.2) [!].gb", &gb->cartSize);
-    // gb->cart = LoadRom("../tests/carts/Pac-Man (U) (Namco).gb", &gb->cartSize);
+    gb->cart = LoadRom(rom, &gb->cartSize);
     if (gb->cart == NULL)
     {
         return;
@@ -1551,12 +1644,9 @@ void StartGB(GB *gb)
 
     DumpRomInfo(gb);
 
-    // Info from https://realboyemulator.files.wordpress.com/2013/01/gbcpuman.pdf
+    // Info from
+    // https://realboyemulator.files.wordpress.com/2013/01/gbcpuman.pdf
     // Power Up Sequence (Found on Page 18)
-    // BC = $0013
-    // DE = $00D8
-    // HL = $014D
-    // Stack Pointer = $FFFE
 
     gb->regs[REG_BC] = 0x0013;
     gb->regs[REG_DE] = 0x00D8;
@@ -1564,12 +1654,9 @@ void StartGB(GB *gb)
     gb->regs[REG_SP] = 0xFFFE;
     gb->regs[REG_AF] = 0x0000;
 
-    // TODO: Run boot up procedure instead of jumping to cartridge immediately
     gb->regs[REG_PC] = 0x0;
-    gb->IME = true;
-    gb->halted = false;
-
-    memset(gb->mem, 0x00, sizeof(uint8_t) * 0x8000);
+    gb->IME          = false;
+    gb->halted       = false;
 
     WriteMem(gb, 0xFF05, 0x00);
     WriteMem(gb, 0xFF06, 0x00);

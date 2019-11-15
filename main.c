@@ -1,9 +1,16 @@
-#include <stdio.h>
 #include "GB.h"
+
+#include <stdio.h>
 
 int main(int argc, char **argv)
 {
-    printf("Hello, world!\n");
+    if (argc < 2)
+    {
+        printf("Please provide a rom\n");
+        return 0;
+    }
+
+    printf("%s\n", argv[1]);
 
     GB *gb = CreateGB("");
     if (gb == NULL)
@@ -12,7 +19,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    StartGB(gb);
+    StartGB(gb, argv[1]);
 
     DestroyGB(gb);
     gb = NULL;

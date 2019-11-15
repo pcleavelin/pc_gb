@@ -1,0 +1,26 @@
+Language: Cpp
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignEscapedNewlines: true
+AlignOperands: true
+AlignTrailingComments: true
+
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Allman
+SpaceBeforeParens: true
+SpacesBeforeTrailingComments: 1
+
+IncludeBlocks: Regroup
+SortIncludes: true
+
+IndentCaseLabels: true
+IndentWidth: 4
+UseTab: Never

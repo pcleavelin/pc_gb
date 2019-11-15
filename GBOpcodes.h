@@ -30,9 +30,40 @@
 #define SERIAL_MASK 0x8
 #define JOYPAD_MASK 0x10
 
+#define CART_TYPE_ROM_ONLY 0x00
+#define CART_TYPE_MBC1 0x01
+#define CART_TYPE_MBC1_RAM 0x02
+#define CART_TYPE_MBC1_RAM_BATTERY 0x03
+#define CART_TYPE_MBC2 0x05
+#define CART_TYPE_MBC2_BATTERY 0x06
+#define CART_TYPE_ROM_RAM 0x08
+#define CART_TYPE_ROM_RAM_BATTERY 0x09
+#define CART_TYPE_MMM01 0x0B
+#define CART_TYPE_MMM01_RAM 0x0C
+#define CART_TYPE_MMM01_RAM_BATTERY 0x0D
+#define CART_TYPE_MBC3_TIMER_BATTERY 0x0F
+#define CART_TYPE_MBC3_TIMER_RAM_BATTERY 0x10
+#define CART_TYPE_MBC3 0x11
+#define CART_TYPE_MBC3_RAM 0x12
+#define CART_TYPE_MBC3_RAM_BATTERY 0x13
+#define CART_TYPE_MBC4 0x15
+#define CART_TYPE_MBC4_RAM 0x16
+#define CART_TYPE_MBC4_RAM_BATTERY 0x17
+#define CART_TYPE_MBC5 0x19
+#define CART_TYPE_MBC5_RAM 0x1A
+#define CART_TYPE_MBC5_RAM_BATTERY 0x1B
+#define CART_TYPE_MBC5_RUMBLE 0x1C
+#define CART_TYPE_MBC5_RUMBLE_RAM 0x1D
+#define CART_TYPE_MBC5_RUMBLE_RAM_BATTERY 0x1E
+#define CART_TYPE_POCKET_CAMERA 0xFC
+#define CART_TYPE_BANDAI_TAMA5 0xFD
+#define CART_TYPE_HuC3 0xFE
+#define CART_TYPE_HuC1_RAM_BATTERY 0xFF
+
 #define OP_NOP 0x00
 
-//--------------------------------8bit Load Commands--------------------------------
+//--------------------------------8bit Load
+// Commands--------------------------------
 // ld (nn), SP
 #define OP_LD_ptrnn_SP 0x08
 
@@ -158,7 +189,8 @@
 // ld (nn), A
 #define OP_LD_ptrnn_A 0xEA
 
-//--------------------------------8bit Arthmetic/logical Commands---------------------
+//--------------------------------8bit Arthmetic/logical
+// Commands---------------------
 // add r
 #define OP_ADD_B (0x80 | REG_B)
 #define OP_ADD_C (0x80 | REG_C)
@@ -294,7 +326,8 @@
 // cpl
 #define OP_CPL 0x2F
 
-//--------------------------------16bit Load Commands--------------------------------
+//--------------------------------16bit Load
+// Commands--------------------------------
 // ld rr,nn
 #define OP_LD_BC_nn 0x01
 #define OP_LD_DE_nn 0x11
@@ -315,7 +348,8 @@
 #define OP_POP_HL (REG_HL << 4 | 0xC1)
 #define OP_POP_AF (REG_AF << 4 | 0xC1)
 
-//--------------------------------16bit Arithmetic Commands----------------------------
+//--------------------------------16bit Arithmetic
+// Commands----------------------------
 // add HL,rr
 #define OP_ADD_HL_BC (REG_BC << 4 | 0x9)
 #define OP_ADD_HL_DE (REG_DE << 4 | 0x9)
@@ -337,7 +371,8 @@
 // add SP,dd
 #define OP_ADD_SP_dd 0xE8
 
-//------------------------------Rotate/Shift Commands---------------------------------
+//------------------------------Rotate/Shift
+// Commands---------------------------------
 // rlca
 #define OP_RLCA 0x07
 
@@ -395,7 +430,8 @@
 #define OP_CB_SRL_L (REG_L | 0x38)
 #define OP_CB_SRL_A (REG_A | 0x38)
 
-//------------------------------Single Bit Operation Commands-------------------------
+//------------------------------Single Bit Operation
+// Commands-------------------------
 // bit n,r
 #define OP_CB_BIT_0_B (REG_B | 0x40)
 #define OP_CB_BIT_1_B (REG_B | 0x48)
@@ -512,7 +548,8 @@
 #define OP_CB_RES_6_A (REG_A | (0x70 + 0x40))
 #define OP_CB_RES_7_A (REG_A | (0x78 + 0x40))
 
-//--------------------------------CPU Control Commands--------------------------------
+//--------------------------------CPU Control
+// Commands--------------------------------
 #define OP_CCF 0x3F
 #define OP_SCF 0x37
 #define OP_HALT 0x76
