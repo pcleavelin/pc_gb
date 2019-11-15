@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "cstdbool": "cpp"
+        "cstdbool": "cpp",
+        "typeinfo": "cpp"
     }
 }

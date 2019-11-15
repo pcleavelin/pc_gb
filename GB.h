@@ -15,8 +15,6 @@
 
 #include "GBOpcodes.h"
 
-// #define _DBG_INSTR_
-
 #define GB_VID_WIDTH 160
 #define GB_VID_HEIGHT 144
 
@@ -36,6 +34,33 @@
 #define CART_HEADER_CHECKSUM 0x14D
 #define CART_GLOBAL_CHECKSUM 0x14E
 #define CART_GLOBAL_CHECKSUM_END 0x14F
+
+#define instr(opcode, val, name) \
+    else if (opcode == val)
+
+#define instr_ld_r_r(opcode, base, shift, name) \
+    else if ((opcode & base) == base && ((opcode >> shift & 0b111) <= 7 && (opcode >> shift & 0b111) != 6) && ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
+
+#define instr_bit(opcode, name) \
+    else if ((opcode & 0x40) == 0x40 && (opcode >> 3 & 0b111) >= 0x8 && (opcode >> 3 & 0b111) < 0xF && ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
+
+#define instr_res_bit(opcode, name) \
+    else if ((opcode & 0x0) == 0x80 && (opcode >> 3 & 0b111) >= 0x8 && (opcode >> 3 & 0b111) < 0xF && ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
+
+#define instr_rst(opcode, name) \
+    else if ((opcode & 0xC7) == 0xC7 && ((opcode & 0b111) <= 7))
+
+#define instr_left_r(opcode, base, shift, name) \
+    else if ((opcode & base) == base && ((opcode >> shift & 0b111) <= 7 && (opcode >> shift & 0b111) != 6))
+
+#define instr_left_f(opcode, base, shift, name) \
+    else if ((opcode & base) == base && ((opcode >> shift & 0b11) <= 3))
+
+#define instr_right_r(opcode, base, name) \
+    else if ((opcode & base) == base && ((opcode & 0b111) <= 7 && (opcode & 0b111) != 6))
+
+#define instr_invalid() \
+    else
 
 // 0xFF40 - LCD Control Register
 // Bit 7 - LCD Power           (0=Off, 1=On)
@@ -208,10 +233,10 @@ uint8_t ReadMem(GB *gb, uint16_t addr)
     {
         return gb->mem[addr - 0x8000];
     }
-    // else if (addr <= 0xFF && gb->mem[0xFF50 - 0x8000] == 0)
-    // {
-    //     return gb->bootRom[addr % 0x100];
-    // }
+    else if (addr <= 0xFF && gb->mem[0xFF50 - 0x8000] == 0)
+    {
+        return gb->bootRom[addr % 0x100];
+    }
     else if (addr >= 0x4000 && addr <= 0x7FFF)
     {
         uint8_t bank = gb->mem[0x2000] & 0b11111;
@@ -618,9 +643,6 @@ void Push16(GB *gb, uint16_t val)
 
 void CallInterrupt(GB *gb, uint8_t vector)
 {
-#ifdef _DBG_INSTR_
-    printf("Calling interrupt: $%01X\n", vector);
-#endif
 
     Push16(gb, gb->regs[REG_PC]);
     gb->regs[REG_PC] = vector;
@@ -637,24 +659,15 @@ uint16_t Pop16(GB *gb)
     return val;
 }
 
-// TODO: don't use a switch, instead just do and if-else block
-// will allow for algorithmic checking of opcodes
-bool DoCBInstruction(GB *gb)
+bool DoCBInstruction(GB *gb, uint16_t instrPC)
 {
-    const uint8_t instrPC = gb->regs[REG_PC];
-
     uint8_t opcode = FetchByte(gb);
 
-    switch (opcode)
+    if (false)
     {
-    //------------------------------Rotate/Shift Commands---------------------------------
-    case OP_CB_RL_B:
-    case OP_CB_RL_C:
-    case OP_CB_RL_D:
-    case OP_CB_RL_E:
-    case OP_CB_RL_H:
-    case OP_CB_RL_L:
-    case OP_CB_RL_A:
+    }
+
+    instr_right_r(opcode, 0x10, "rl r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, reg);
@@ -666,20 +679,9 @@ bool DoCBInstruction(GB *gb)
         SetFlag(gb, FLAG_C, Get8Reg(gb, reg) >> 7);
 
         Set8Reg(gb, reg, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RL %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_CB_RR_B:
-    case OP_CB_RR_C:
-    case OP_CB_RR_D:
-    case OP_CB_RR_E:
-    case OP_CB_RR_H:
-    case OP_CB_RR_L:
-    case OP_CB_RR_A:
+    instr_right_r(opcode, 0x18, "rr r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, reg);
@@ -691,14 +693,9 @@ bool DoCBInstruction(GB *gb)
         SetFlag(gb, FLAG_C, Get8Reg(gb, reg) & 1);
 
         Set8Reg(gb, reg, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RR %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_CB_RR_ptrHL:
+    instr(opcode, 0x1E, "rr (hl)")
     {
         uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
 
@@ -709,20 +706,9 @@ bool DoCBInstruction(GB *gb)
         SetFlag(gb, FLAG_C, ReadMem(gb, gb->regs[REG_HL]) & 1);
 
         WriteMem(gb, gb->regs[REG_HL], val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RR ($%02X)\n", instrPC, gb->regs[REG_HL]);
-#endif
     }
-    break;
 
-    case OP_CB_SLA_B:
-    case OP_CB_SLA_C:
-    case OP_CB_SLA_D:
-    case OP_CB_SLA_E:
-    case OP_CB_SLA_H:
-    case OP_CB_SLA_L:
-    case OP_CB_SLA_A:
+    instr_right_r(opcode, 0x20, "sla r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, reg);
@@ -730,20 +716,9 @@ bool DoCBInstruction(GB *gb)
         val <<= 1;
 
         Set8Reg(gb, reg, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, SRL %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_CB_SWAP_B:
-    case OP_CB_SWAP_C:
-    case OP_CB_SWAP_D:
-    case OP_CB_SWAP_E:
-    case OP_CB_SWAP_H:
-    case OP_CB_SWAP_L:
-    case OP_CB_SWAP_A:
+    instr_right_r(opcode, 0x30, "swap r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, reg);
@@ -752,20 +727,9 @@ bool DoCBInstruction(GB *gb)
         val = (val >> 4) | (lo << 4);
 
         Set8Reg(gb, reg, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, SWAP %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_CB_SRL_B:
-    case OP_CB_SRL_C:
-    case OP_CB_SRL_D:
-    case OP_CB_SRL_E:
-    case OP_CB_SRL_H:
-    case OP_CB_SRL_L:
-    case OP_CB_SRL_A:
+    instr_right_r(opcode, 0x38, "srl r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, reg);
@@ -773,70 +737,9 @@ bool DoCBInstruction(GB *gb)
         val >>= 1;
 
         Set8Reg(gb, reg, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, SRL %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    // --------------------Single Bit Operation Commands-------------------------------
-    case OP_CB_BIT_0_B:
-    case OP_CB_BIT_1_B:
-    case OP_CB_BIT_2_B:
-    case OP_CB_BIT_3_B:
-    case OP_CB_BIT_4_B:
-    case OP_CB_BIT_5_B:
-    case OP_CB_BIT_6_B:
-    case OP_CB_BIT_7_B:
-    case OP_CB_BIT_0_C:
-    case OP_CB_BIT_1_C:
-    case OP_CB_BIT_2_C:
-    case OP_CB_BIT_3_C:
-    case OP_CB_BIT_4_C:
-    case OP_CB_BIT_5_C:
-    case OP_CB_BIT_6_C:
-    case OP_CB_BIT_7_C:
-    case OP_CB_BIT_0_D:
-    case OP_CB_BIT_1_D:
-    case OP_CB_BIT_2_D:
-    case OP_CB_BIT_3_D:
-    case OP_CB_BIT_4_D:
-    case OP_CB_BIT_5_D:
-    case OP_CB_BIT_6_D:
-    case OP_CB_BIT_7_D:
-    case OP_CB_BIT_0_E:
-    case OP_CB_BIT_1_E:
-    case OP_CB_BIT_2_E:
-    case OP_CB_BIT_3_E:
-    case OP_CB_BIT_4_E:
-    case OP_CB_BIT_5_E:
-    case OP_CB_BIT_6_E:
-    case OP_CB_BIT_7_E:
-    case OP_CB_BIT_0_H:
-    case OP_CB_BIT_1_H:
-    case OP_CB_BIT_2_H:
-    case OP_CB_BIT_3_H:
-    case OP_CB_BIT_4_H:
-    case OP_CB_BIT_5_H:
-    case OP_CB_BIT_6_H:
-    case OP_CB_BIT_7_H:
-    case OP_CB_BIT_0_L:
-    case OP_CB_BIT_1_L:
-    case OP_CB_BIT_2_L:
-    case OP_CB_BIT_3_L:
-    case OP_CB_BIT_4_L:
-    case OP_CB_BIT_5_L:
-    case OP_CB_BIT_6_L:
-    case OP_CB_BIT_7_L:
-    case OP_CB_BIT_0_A:
-    case OP_CB_BIT_1_A:
-    case OP_CB_BIT_2_A:
-    case OP_CB_BIT_3_A:
-    case OP_CB_BIT_4_A:
-    case OP_CB_BIT_5_A:
-    case OP_CB_BIT_6_A:
-    case OP_CB_BIT_7_A:
+    instr_bit(opcode, "bit n,r")
     {
         uint8_t bit = opcode >> 4;
         uint8_t reg = Get8Reg(gb, opcode & 0b111);
@@ -844,84 +747,20 @@ bool DoCBInstruction(GB *gb)
         SetFlag(gb, FLAG_Z, (reg & (1 << bit)) == 0);
         SetFlag(gb, FLAG_N, 0);
         SetFlag(gb, FLAG_H, 1);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, BIT %01X,%s\n", instrPC, bit, GetReg8Name(opcode & 0b111));
-#endif
     }
-    break;
 
-    case OP_CB_RES_0_B:
-    case OP_CB_RES_1_B:
-    case OP_CB_RES_2_B:
-    case OP_CB_RES_3_B:
-    case OP_CB_RES_4_B:
-    case OP_CB_RES_5_B:
-    case OP_CB_RES_6_B:
-    case OP_CB_RES_7_B:
-    case OP_CB_RES_0_C:
-    case OP_CB_RES_1_C:
-    case OP_CB_RES_2_C:
-    case OP_CB_RES_3_C:
-    case OP_CB_RES_4_C:
-    case OP_CB_RES_5_C:
-    case OP_CB_RES_6_C:
-    case OP_CB_RES_7_C:
-    case OP_CB_RES_0_D:
-    case OP_CB_RES_1_D:
-    case OP_CB_RES_2_D:
-    case OP_CB_RES_3_D:
-    case OP_CB_RES_4_D:
-    case OP_CB_RES_5_D:
-    case OP_CB_RES_6_D:
-    case OP_CB_RES_7_D:
-    case OP_CB_RES_0_E:
-    case OP_CB_RES_1_E:
-    case OP_CB_RES_2_E:
-    case OP_CB_RES_3_E:
-    case OP_CB_RES_4_E:
-    case OP_CB_RES_5_E:
-    case OP_CB_RES_6_E:
-    case OP_CB_RES_7_E:
-    case OP_CB_RES_0_H:
-    case OP_CB_RES_1_H:
-    case OP_CB_RES_2_H:
-    case OP_CB_RES_3_H:
-    case OP_CB_RES_4_H:
-    case OP_CB_RES_5_H:
-    case OP_CB_RES_6_H:
-    case OP_CB_RES_7_H:
-    case OP_CB_RES_0_L:
-    case OP_CB_RES_1_L:
-    case OP_CB_RES_2_L:
-    case OP_CB_RES_3_L:
-    case OP_CB_RES_4_L:
-    case OP_CB_RES_5_L:
-    case OP_CB_RES_6_L:
-    case OP_CB_RES_7_L:
-    case OP_CB_RES_0_A:
-    case OP_CB_RES_1_A:
-    case OP_CB_RES_2_A:
-    case OP_CB_RES_3_A:
-    case OP_CB_RES_4_A:
-    case OP_CB_RES_5_A:
-    case OP_CB_RES_6_A:
-    case OP_CB_RES_7_A:
+    instr_res_bit(opcode, "res n,r")
     {
         uint8_t bit = opcode >> 4;
         uint8_t reg = Get8Reg(gb, opcode & 0b111);
 
         Set8Reg(gb, opcode & 0b111, (reg & ~(1 << bit)));
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, BIT %01X,%s\n", instrPC, bit, GetReg8Name(opcode & 0b111));
-#endif
     }
-    break;
 
-    default:
+    instr_invalid()
+    {
         DumpCPURegisters(gb);
-        printf("Unknown CB instruction: 0x%01X\n", opcode);
+        printf("PC: $%02X: Unknown CB-prefixed instruction: 0x%01X\n", instrPC, opcode);
         return false;
     }
 
@@ -931,318 +770,148 @@ bool DoCBInstruction(GB *gb)
 bool DoInstruction(GB *gb)
 {
     const uint16_t instrPC = gb->regs[REG_PC];
-
-    // Fetch opcode
     uint8_t opcode = FetchByte(gb);
 
     if (opcode == 0xCB)
     {
-        return DoCBInstruction(gb);
+        return DoCBInstruction(gb, instrPC);
     }
 
-    switch (opcode)
-    {
-    case OP_NOP:
+    if (opcode == 0x00)
     {
     }
-    break;
 
-    // 8bit Load Commands
-    case OP_LD_ptrnn_SP:
+    //------------------------------8 bit Load Commands------------------------------
+    instr(opcode, 0x08, "ld (nn), sp")
     {
         uint8_t addr = FetchWord(gb);
 
         WriteMem(gb, addr, gb->regs[REG_SP] >> 8);
         WriteMem(gb, addr + 1, gb->regs[REG_SP] & 0xFF);
     }
-    break;
 
-    case OP_LD_B_B:
-    case OP_LD_B_C:
-    case OP_LD_B_D:
-    case OP_LD_B_E:
-    case OP_LD_B_H:
-    case OP_LD_B_L:
-    case OP_LD_B_A:
-    case OP_LD_C_B:
-    case OP_LD_C_C:
-    case OP_LD_C_D:
-    case OP_LD_C_E:
-    case OP_LD_C_H:
-    case OP_LD_C_L:
-    case OP_LD_C_A:
-    case OP_LD_D_B:
-    case OP_LD_D_C:
-    case OP_LD_D_D:
-    case OP_LD_D_E:
-    case OP_LD_D_H:
-    case OP_LD_D_L:
-    case OP_LD_D_A:
-    case OP_LD_E_B:
-    case OP_LD_E_C:
-    case OP_LD_E_D:
-    case OP_LD_E_E:
-    case OP_LD_E_H:
-    case OP_LD_E_L:
-    case OP_LD_E_A:
-    case OP_LD_H_B:
-    case OP_LD_H_C:
-    case OP_LD_H_D:
-    case OP_LD_H_E:
-    case OP_LD_H_H:
-    case OP_LD_H_L:
-    case OP_LD_H_A:
-    case OP_LD_L_B:
-    case OP_LD_L_C:
-    case OP_LD_L_D:
-    case OP_LD_L_E:
-    case OP_LD_L_H:
-    case OP_LD_L_L:
-    case OP_LD_L_A:
-    case OP_LD_A_B:
-    case OP_LD_A_C:
-    case OP_LD_A_D:
-    case OP_LD_A_E:
-    case OP_LD_A_H:
-    case OP_LD_A_L:
-    case OP_LD_A_A:
+    instr_ld_r_r(opcode, 0x40, 3, "ld r,r")
     {
-
         uint8_t regDst = (opcode >> 3) & 0b111;
         uint8_t regSrc = opcode & 0b111;
 
         Set8Reg(gb, regDst, Get8Reg(gb, regSrc));
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD %s,%s\n", instrPC, GetReg8Name(regDst), GetReg8Name(regSrc));
-#endif
     }
-    break;
 
-    case OP_LD_B_n:
-    case OP_LD_C_n:
-    case OP_LD_D_n:
-    case OP_LD_E_n:
-    case OP_LD_H_n:
-    case OP_LD_L_n:
-    case OP_LD_A_n:
+    instr_left_r(opcode, 0x6, 3, "ld r,n")
     {
-
         uint8_t regDst = (opcode >> 3) & 0b111;
         uint8_t val = FetchByte(gb);
 
         Set8Reg(gb, regDst, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD %s,$%01X\n", instrPC, GetReg8Name(regDst), val);
-#endif
     }
-    break;
 
-    case OP_LD_ptrDE_A:
+    instr(opcode, 0x12, "ld (de),a")
     {
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD ($%02X),A - (DE)\n", instrPC, gb->regs[REG_DE]);
-#endif
-
         WriteMem(gb, gb->regs[REG_DE], Get8Reg(gb, REG_A));
     }
-    break;
 
-    case OP_LD_A_IOn:
+    instr(opcode, 0xF0, "ld a,($FF00+n)")
     {
         uint8_t offset = FetchByte(gb);
-        // if (offset < 0x7F)
         Set8Reg(gb, REG_A, ReadMem(gb, 0xFF00 + offset));
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD A, (FF00+$%01X) - A is now 0x%01X!\n", instrPC, offset, Get8Reg(gb, REG_A));
-#endif
     }
-    break;
 
-    case OP_LD_IOn_A:
+    instr(opcode, 0xE0, "ld ($FF00+n), a")
     {
         uint8_t offset = FetchByte(gb);
-        // if (offset < 0x7F)
-        {
-            WriteMem(gb, 0xFF00 + offset, Get8Reg(gb, REG_A));
-        }
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD (FF00+$%01X),A - now $%01X!\n", instrPC, offset, ReadMem(gb, 0xFF00 + offset));
-#endif
+        WriteMem(gb, 0xFF00 + offset, Get8Reg(gb, REG_A));
     }
-    break;
 
-    case OP_LD_IOC_A:
+    instr(opcode, 0xE2, "ld ($FF00+c), a")
     {
         uint8_t offset = Get8Reg(gb, REG_C);
-        // if (offset < 0x7F)
-        {
-            WriteMem(gb, 0xFF00 + offset, Get8Reg(gb, REG_A));
-        }
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD (FF00+$%01X),A - now $%01X!\n", instrPC, offset, ReadMem(gb, 0xFF00 + offset));
-#endif
+        WriteMem(gb, 0xFF00 + offset, Get8Reg(gb, REG_A));
     }
-    break;
 
-    case OP_LDI_A_ptrHL:
+    instr(opcode, 0x2A, "ldi a,(hl)")
     {
-
         uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
 
         Set8Reg(gb, REG_A, val);
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LDI A,($%02X) - (HL)\n", instrPC, gb->regs[REG_HL]);
-#endif
         gb->regs[REG_HL] += 1;
     }
-    break;
 
-    case OP_LDI_ptrHL_A:
+    instr(opcode, 0x22, "ldi a,(hl)")
     {
         uint8_t val = Get8Reg(gb, REG_A);
         WriteMem(gb, gb->regs[REG_HL], val);
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LDI ($%02X), A - (HL)\n", instrPC, gb->regs[REG_HL]);
-#endif
         gb->regs[REG_HL] += 1;
     }
-    break;
 
-    case OP_LDD_ptrHL_A:
+    instr(opcode, 0x32, "ldd a,(hl)")
     {
         uint8_t val = Get8Reg(gb, REG_A);
         WriteMem(gb, gb->regs[REG_HL], val);
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LDD ($%02X), A - (HL)\n", instrPC, gb->regs[REG_HL]);
-#endif
         gb->regs[REG_HL] -= 1;
     }
-    break;
 
-    case OP_LD_B_ptrHL:
-    case OP_LD_C_ptrHL:
-    case OP_LD_D_ptrHL:
-    case OP_LD_E_ptrHL:
-    case OP_LD_H_ptrHL:
-    case OP_LD_L_ptrHL:
-    case OP_LD_A_ptrHL:
+    instr_left_r(opcode, 0x46, 3, "ld a,(hl)")
     {
         uint8_t reg = (opcode >> 3) & 0b111;
         uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD %s,($%02X) - (HL)\n", instrPC, GetReg8Name(reg), gb->regs[REG_HL]);
-#endif
-
         Set8Reg(gb, reg, val);
     }
-    break;
 
-    case OP_LD_ptrHL_B:
-    case OP_LD_ptrHL_C:
-    case OP_LD_ptrHL_D:
-    case OP_LD_ptrHL_E:
-    case OP_LD_ptrHL_H:
-    case OP_LD_ptrHL_L:
-    case OP_LD_ptrHL_A:
+    instr_right_r(opcode, 0x70, "ld (hl),r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, reg);
         WriteMem(gb, gb->regs[REG_HL], val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD ($%02X), %s - (HL)\n", instrPC, gb->regs[REG_HL], GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_LD_ptrHL_n:
+    instr(opcode, 0x36, "ld (hl),n")
     {
         uint8_t val = FetchByte(gb);
         WriteMem(gb, gb->regs[REG_HL], val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD ($%02X), $%01X - (HL)\n", instrPC, gb->regs[REG_HL], val);
-#endif
     }
-    break;
 
-    case OP_LD_A_ptrBC:
+    instr(opcode, 0x0A, "ld a,(bc)")
     {
         uint8_t val = ReadMem(gb, gb->regs[REG_BC]);
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD A,($%02X) - (BC)\n", instrPC, gb->regs[REG_BC]);
-#endif
     }
-    break;
 
-    case OP_LD_A_ptrDE:
+    instr(opcode, 0x1A, "ld a,(de)")
     {
         uint8_t val = ReadMem(gb, gb->regs[REG_DE]);
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD A,($%02X) - (DE)\n", instrPC, gb->regs[REG_DE]);
-#endif
     }
-    break;
 
-    case OP_LD_A_ptrnn:
+    instr(opcode, 0xFA, "ld a,(nn)")
     {
         uint8_t addr = FetchWord(gb);
         uint8_t val = ReadMem(gb, addr);
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD A,($%02X)\n", instrPC, addr);
-#endif
     }
-    break;
 
-    case OP_LD_ptrBC_A:
+    instr(opcode, 0x02, "ld (bc),a")
     {
         uint8_t val = Get8Reg(gb, REG_A);
         WriteMem(gb, gb->regs[REG_BC], val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD ($%02X), A - (BC)\n", instrPC, gb->regs[REG_BC]);
-#endif
     }
-    break;
 
-    case OP_LD_ptrnn_A:
+    instr(opcode, 0xEA, "ld (nn),a")
     {
         uint16_t addr = FetchWord(gb);
 
         WriteMem(gb, addr, Get8Reg(gb, REG_A));
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD ($%02X),A\n", instrPC, addr);
-#endif
     }
-    break;
 
-    //--------------------------------8bit Arthmetic/logical Commands--------------------------------
-    case OP_ADD_B:
-    case OP_ADD_C:
-    case OP_ADD_D:
-    case OP_ADD_E:
-    case OP_ADD_H:
-    case OP_ADD_L:
-    case OP_ADD_A:
+    //------------------------------8 bit Arthimetic/Logical Commands------------------------------
+    instr_right_r(opcode, 0x80, "add a,r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) + Get8Reg(gb, reg);
@@ -1253,14 +922,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) < (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, ADD %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_ADD_A_n:
+    instr(opcode, 0xC6, "add a,n")
     {
         uint8_t val = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) + val;
@@ -1271,19 +935,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (newVal & 0xF) < (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, newVal);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, ADD ($%01X)\n", instrPC, Get8Reg(gb, REG_A), val);
-#endif
     }
-    break;
 
-    case OP_ADC_B:
-    case OP_ADC_C:
-    case OP_ADC_D:
-    case OP_ADC_E:
-    case OP_ADC_H:
-    case OP_ADC_L:
-    case OP_ADC_A:
+    instr_right_r(opcode, 0x88, "adc a,r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) + Get8Reg(gb, reg) + (gb->regs[REG_AF] & 0x8 >> 3);
@@ -1294,14 +948,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) < (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, ADC %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_ADD_A_ptrHL:
+    instr(opcode, 0x86, "add a,(hl)")
     {
         uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
         uint8_t newVal = Get8Reg(gb, REG_A) + val;
@@ -1312,13 +961,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (newVal & 0xF) < (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, newVal);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, ADD ($%02X) - (HL) A=$%01X\n", instrPC, gb->regs[REG_HL], Get8Reg(gb, REG_A));
-#endif
     }
-    break;
 
-    case OP_ADC_A_ptrHL:
+    instr(opcode, 0x8E, "adc a,(hl)")
     {
         uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
         uint8_t newVal = Get8Reg(gb, REG_A) + val + (gb->regs[REG_AF] & 0x8 >> 3);
@@ -1329,19 +974,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (newVal & 0xF) < (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, newVal);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, ADC ($%02X) - (HL) A=$%01X\n", instrPC, gb->regs[REG_HL], Get8Reg(gb, REG_A));
-#endif
     }
-    break;
 
-    case OP_SUB_B:
-    case OP_SUB_C:
-    case OP_SUB_D:
-    case OP_SUB_E:
-    case OP_SUB_H:
-    case OP_SUB_L:
-    case OP_SUB_A:
+    instr_right_r(opcode, 0x90, "sub a,r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) - Get8Reg(gb, reg);
@@ -1352,14 +987,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) > (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, SUB %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_SUB_A_n:
+    instr(opcode, 0xD6, "sub a,n")
     {
         uint8_t val = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) - val;
@@ -1370,19 +1000,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (newVal & 0xF) > (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, newVal);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, ADD ($%01X)\n", instrPC, Get8Reg(gb, REG_A), val);
-#endif
     }
-    break;
 
-    case OP_SBC_B:
-    case OP_SBC_C:
-    case OP_SBC_D:
-    case OP_SBC_E:
-    case OP_SBC_H:
-    case OP_SBC_L:
-    case OP_SBC_A:
+    instr_right_r(opcode, 0x98, "sbc a,r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) - Get8Reg(gb, reg) - (gb->regs[REG_AF] & 0x8 >> 3);
@@ -1393,14 +1013,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) > (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, SBC A,%s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_SBC_ptrHL:
+    instr(opcode, 0x9E, "sbc a,(hl)")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) - ReadMem(gb, gb->regs[REG_HL]) - (gb->regs[REG_AF] & 0x8 >> 3);
@@ -1411,20 +1026,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) > (Get8Reg(gb, REG_A) & 0xF));
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, SBC A,%s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_AND_B:
-    case OP_AND_C:
-    case OP_AND_D:
-    case OP_AND_E:
-    case OP_AND_H:
-    case OP_AND_L:
-    case OP_AND_A:
+    instr_right_r(opcode, 0xA0, "and a,r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) & Get8Reg(gb, reg);
@@ -1434,14 +1038,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, 0);
         SetFlag(gb, FLAG_N, 0);
         SetFlag(gb, FLAG_H, 1);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, AND %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_AND_A_nn:
+    instr(opcode, 0xE6, "and a,n")
     {
         uint8_t val = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) & val;
@@ -1451,14 +1050,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, 0);
         SetFlag(gb, FLAG_N, 0);
         SetFlag(gb, FLAG_H, 1);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, AND $%01X\n", instrPC, val);
-#endif
     }
-    break;
 
-    case OP_OR_n:
+    instr(opcode, 0xF6, "or a,n")
     {
         uint8_t val = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) | val;
@@ -1468,14 +1062,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, 0);
         SetFlag(gb, FLAG_N, 0);
         SetFlag(gb, FLAG_H, 0);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, OR $%01X\n", instrPC, val);
-#endif
     }
-    break;
 
-    case OP_OR_ptrHL:
+    instr(opcode, 0xB6, "or a,(hl)")
     {
         uint8_t newVal = Get8Reg(gb, REG_A) | ReadMem(gb, gb->regs[REG_HL]);
         Set8Reg(gb, REG_A, newVal);
@@ -1484,20 +1073,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, 0);
         SetFlag(gb, FLAG_N, 0);
         SetFlag(gb, FLAG_H, 0);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, OR ($%01X) - (HL)\n", instrPC, gb->regs[REG_HL]);
-#endif
     }
-    break;
 
-    case OP_XOR_B:
-    case OP_XOR_C:
-    case OP_XOR_D:
-    case OP_XOR_E:
-    case OP_XOR_H:
-    case OP_XOR_L:
-    case OP_XOR_A:
+    instr_right_r(opcode, 0xA8, "xor a,r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) ^ Get8Reg(gb, reg);
@@ -1506,14 +1084,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, 0);
         SetFlag(gb, FLAG_N, 0);
         SetFlag(gb, FLAG_H, 0);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, XOR %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_XOR_ptrHL:
+    instr(opcode, 0xAE, "xor a,(hl)")
     {
         uint8_t val = Get8Reg(gb, REG_A) ^ ReadMem(gb, gb->regs[REG_HL]);
 
@@ -1521,20 +1094,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, 0);
         SetFlag(gb, FLAG_N, 0);
         SetFlag(gb, FLAG_H, 0);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, XOR ($%02X) - (HL)\n", instrPC, gb->regs[REG_HL]);
-#endif
     }
-    break;
 
-    case OP_OR_B:
-    case OP_OR_C:
-    case OP_OR_D:
-    case OP_OR_E:
-    case OP_OR_H:
-    case OP_OR_L:
-    case OP_OR_A:
+    instr_right_r(opcode, 0xB0, "or a,r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) | Get8Reg(gb, reg);
@@ -1544,20 +1106,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, 0);
         SetFlag(gb, FLAG_N, 0);
         SetFlag(gb, FLAG_H, 0);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, OR %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_CP_B:
-    case OP_CP_C:
-    case OP_CP_D:
-    case OP_CP_E:
-    case OP_CP_H:
-    case OP_CP_L:
-    case OP_CP_A:
+    instr_right_r(opcode, 0xB8, "cp a,r")
     {
         uint8_t reg = opcode & 0b111;
         uint8_t val = Get8Reg(gb, REG_A) - Get8Reg(gb, reg);
@@ -1566,14 +1117,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, val > Get8Reg(gb, REG_A));
         SetFlag(gb, FLAG_N, 1);
         SetFlag(gb, FLAG_H, (val & 0xF) > (Get8Reg(gb, REG_A) & 0xF));
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, CP %s - A=$%01X\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_CP_n:
+    instr(opcode, 0xFE, "cp a,n")
     {
         uint8_t val = FetchByte(gb);
         uint8_t newVal = Get8Reg(gb, REG_A) - val;
@@ -1582,14 +1128,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, newVal > Get8Reg(gb, REG_A));
         SetFlag(gb, FLAG_N, 1);
         SetFlag(gb, FLAG_H, (newVal & 0xF) > (Get8Reg(gb, REG_A) & 0xF));
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, CP $%01X - A=$%01X\n", instrPC, val, Get8Reg(gb, REG_A));
-#endif
     }
-    break;
 
-    case OP_CP_ptrHL:
+    instr(opcode, 0xBE, "cp a,(hl)")
     {
         uint8_t val = ReadMem(gb, gb->regs[REG_HL]);
         uint8_t newVal = Get8Reg(gb, REG_A) - val;
@@ -1598,22 +1139,10 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_C, newVal > Get8Reg(gb, REG_A));
         SetFlag(gb, FLAG_N, 1);
         SetFlag(gb, FLAG_H, (newVal & 0xF) > (Get8Reg(gb, REG_A) & 0xF));
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, CP ($%01X) - (HL) A=$%01X\n", instrPC, val, Get8Reg(gb, REG_A));
-#endif
     }
-    break;
 
-    case OP_INC_B:
-    case OP_INC_C:
-    case OP_INC_D:
-    case OP_INC_E:
-    case OP_INC_H:
-    case OP_INC_L:
-    case OP_INC_A:
+    instr_left_r(opcode, 0x4, 3, "inc r")
     {
-
         uint8_t reg = (opcode >> 3) & 0b111;
         uint8_t val = Get8Reg(gb, reg) + 1;
 
@@ -1622,14 +1151,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) < (Get8Reg(gb, reg) & 0xF));
 
         Set8Reg(gb, reg, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, INC %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_INC_ptrHL:
+    instr(opcode, 0x34, "inc (hl)")
     {
         uint8_t data = ReadMem(gb, gb->regs[REG_HL]);
         uint8_t val = data + 1;
@@ -1639,22 +1163,10 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) < (data & 0xF));
 
         WriteMem(gb, gb->regs[REG_HL], val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, INC ($%02X) - (HL)\n", instrPC, gb->regs[REG_HL]);
-#endif
     }
-    break;
 
-    case OP_DEC_B:
-    case OP_DEC_C:
-    case OP_DEC_D:
-    case OP_DEC_E:
-    case OP_DEC_H:
-    case OP_DEC_L:
-    case OP_DEC_A:
+    instr_left_r(opcode, 0x5, 3, "dec r")
     {
-
         uint8_t reg = (opcode >> 3) & 0b111;
         uint8_t val = Get8Reg(gb, reg) - 1;
 
@@ -1663,13 +1175,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) > (Get8Reg(gb, reg) & 0xF));
 
         Set8Reg(gb, reg, val);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, DEC %s\n", instrPC, GetReg8Name(reg));
-#endif
     }
-    break;
 
-    case OP_DEC_ptrHL:
+    instr(opcode, 0x35, "dec (hl)")
     {
         uint8_t data = ReadMem(gb, gb->regs[REG_HL]);
         uint8_t val = data - 1;
@@ -1679,14 +1187,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (val & 0xF) > (data & 0xF));
 
         WriteMem(gb, gb->regs[REG_HL], val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, DEC ($%02X) - (HL)\n", instrPC, gb->regs[REG_HL]);
-#endif
     }
-    break;
 
-    case OP_DAA:
+    instr(opcode, 0x27, "daa")
     {
         uint8_t val = Get8Reg(gb, REG_A);
 
@@ -1722,79 +1225,39 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, 0);
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, DAA\n", instrPC);
-#endif
     }
-    break;
 
-    case OP_CPL:
+    instr(opcode, 0x2F, "cpl")
     {
         uint8_t val = Get8Reg(gb, REG_A) ^ 0xFF;
         Set8Reg(gb, REG_A, val);
 
         SetFlag(gb, FLAG_N, 1);
         SetFlag(gb, FLAG_H, 1);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, CPL\n", instrPC);
-#endif
     }
-    break;
 
-    //--------------------------16bit Load Commands--------------------------------------
-    case OP_LD_BC_nn:
-    case OP_LD_DE_nn:
-    case OP_LD_HL_nn:
-    case OP_LD_SP_nn:
+    //------------------------------16 bit Load/Arithmetic/Logical Commands------------------------------
+    instr_left_r(opcode, 0x01, 4, "ld rr, nn")
     {
-
         uint8_t reg = (opcode & 0xF0) >> 4;
         uint16_t val = FetchWord(gb);
 
         gb->regs[reg] = val;
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, LD %s,$%02X\n", instrPC, GetRegName(reg), val);
-#endif
     }
-    break;
 
-    case OP_PUSH_BC:
-    case OP_PUSH_DE:
-    case OP_PUSH_HL:
-    case OP_PUSH_AF:
+    instr_left_r(opcode, 0xC5, 4, "push rr")
     {
         uint8_t reg = (opcode >> 4) & 0b11;
         Push16(gb, gb->regs[reg]);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, PUSH %s\n", instrPC, GetRegName(reg));
-        printf("Pushed $%02X\n", gb->regs[reg]);
-#endif
     }
-    break;
 
-    case OP_POP_BC:
-    case OP_POP_DE:
-    case OP_POP_HL:
-    case OP_POP_AF:
+    instr_left_r(opcode, 0xC1, 4, "pop rr")
     {
         uint8_t reg = (opcode >> 4) & 0b11;
         gb->regs[reg] = Pop16(gb);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, POP %s\n", instrPC, GetRegName(reg));
-        printf("Popped $%02X\n", gb->regs[reg]);
-#endif
     }
-    break;
 
-    case OP_ADD_HL_BC:
-    case OP_ADD_HL_DE:
-    case OP_ADD_HL_HL:
-    case OP_ADD_HL_SP:
+    instr_left_r(opcode, 0x09, 4, "add hl, rr")
     {
         uint8_t reg = (opcode >> 4) & 0b11;
         uint8_t newVal = gb->regs[REG_HL] + gb->regs[reg];
@@ -1804,43 +1267,23 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, (newVal & 0xF) < (gb->regs[REG_HL] & 0xF));
 
         gb->regs[REG_HL] = newVal;
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, ADD ($%02X) - (HL) A=$%01X\n", instrPC, gb->regs[REG_HL], Get8Reg(gb, REG_A));
-#endif
     }
-    break;
 
-    case OP_INC_BC:
-    case OP_INC_DE:
-    case OP_INC_HL:
-    case OP_INC_SP:
+    instr_left_r(opcode, 0x03, 4, "inc rr")
     {
         uint8_t reg = (opcode >> 4) & 0b11;
 
         gb->regs[reg] += 1;
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, INC %s\n", instrPC, GetRegName(reg));
-#endif
     }
-    break;
 
-    case OP_DEC_BC:
-    case OP_DEC_DE:
-    case OP_DEC_HL:
-    case OP_DEC_SP:
+    instr_left_r(opcode, 0x0B, 4, "dec rr")
     {
         uint8_t reg = (opcode >> 4) & 0b11;
 
         gb->regs[reg] -= 1;
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, DEC %s\n", instrPC, GetRegName(reg));
-#endif
     }
-    break;
 
-    case OP_ADD_SP_dd:
+    instr(opcode, 0xE8, "add sp, dd")
     {
         uint8_t val = FetchByte(gb);
         uint8_t newVal = gb->regs[REG_SP];
@@ -1864,15 +1307,10 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_N, 0);
 
         gb->regs[REG_SP] = newVal;
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, ADD SP, $%01X\n", instrPC, val);
-#endif
     }
-    break;
 
-    //------------------------------Rotate/Shift Commands---------------------------------
-    case OP_RLCA:
+    //------------------------------Rotate/Shift Commands------------------------------
+    instr(opcode, 0x07, "rlca")
     {
         uint8_t val = Get8Reg(gb, REG_A);
 
@@ -1886,14 +1324,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, 0);
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RLA\n", instrPC);
-#endif
     }
-    break;
 
-    case OP_RLA:
+    instr(opcode, 0x17, "rla")
     {
         uint8_t val = Get8Reg(gb, REG_A);
 
@@ -1906,14 +1339,9 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, 0);
 
         Set8Reg(gb, REG_A, val);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RLA\n", instrPC);
-#endif
     }
-    break;
 
-    case OP_RRA:
+    instr(opcode, 0x1F, "rra")
     {
         uint8_t val = Get8Reg(gb, REG_A);
 
@@ -1926,98 +1354,60 @@ bool DoInstruction(GB *gb)
         SetFlag(gb, FLAG_H, 0);
 
         Set8Reg(gb, REG_A, val);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RRA\n", instrPC);
-#endif
     }
-    break;
 
-    // CPU Control Commands
-    case OP_CCF:
+    //------------------------------CPU Control Commands------------------------------
+    instr(opcode, 0x3F, "ccf")
     {
         SetFlag(gb, FLAG_C, 0);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, CCF\n", instrPC);
-#endif
     }
-    break;
 
-    case OP_SCF:
+    instr(opcode, 0x37, "scf")
     {
         SetFlag(gb, FLAG_C, 1);
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, SCF\n", instrPC);
-#endif
     }
-    break;
 
-    case OP_HALT:
+    instr(opcode, 0x76, "halt")
     {
         gb->halted = true;
     }
-    break;
 
-    case OP_STOP:
+    instr(opcode, 0x10, "stop")
     {
         // TODO: actualy stop instead of nop'ing
         FetchByte(gb);
     }
-    break;
 
-    case OP_DI:
+    instr(opcode, 0xF3, "di")
     {
         gb->IME = false;
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, DI!\n", instrPC);
-#endif
     }
-    break;
 
-    case OP_EI:
+    instr(opcode, 0xFB, "ei")
     {
         gb->IME = true;
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, EI!\n", instrPC);
-#endif
     }
-    break;
 
-    // Jump Commands
-    case OP_JP_NN:
+    //------------------------------Jump Commands------------------------------
+    instr(opcode, 0xC3, "jp nn")
     {
         uint16_t addr = FetchWord(gb);
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, JP $%02X\n", instrPC, addr);
-#endif
-
         gb->regs[REG_PC] = addr + 1;
     }
-    break;
 
-    case OP_JP_HL:
+    instr(opcode, 0xE9, "jp hl")
     {
         uint16_t addr = gb->regs[REG_HL];
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, JP $%02X\n", instrPC, addr);
-#endif
-
         gb->regs[REG_PC] = addr;
     }
-    break;
 
-    case OP_JP_NZ_nn:
-    case OP_JP_Z_nn:
-    case OP_JP_NC_nn:
-    case OP_JP_C_nn:
+    instr_left_r(opcode, 0xC2, 3, "jp f,nn")
     {
         uint8_t addr = FetchWord(gb);
         uint8_t flag = (opcode >> 3) & 0b11;
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, JP %s,$%02X\n", instrPC, GetFlagName(flag), addr);
-#endif
         if (CheckFlag(gb, flag))
         {
             gb->regs[REG_PC] = addr;
@@ -2027,20 +1417,13 @@ bool DoInstruction(GB *gb)
             // printf("didn't jump\n");
         }
     }
-    break;
 
-    case OP_JR_NZ_dd:
-    case OP_JR_Z_dd:
-    case OP_JR_NC_dd:
-    case OP_JR_C_dd:
+    instr_left_r(opcode, 0x20, 3, "jp f,dd")
     {
 
         uint8_t offset = FetchByte(gb);
         uint8_t flag = (opcode >> 3) & 0b11;
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, JR %s,PC+$%01X\n", instrPC, GetFlagName(flag), offset);
-#endif
         if (CheckFlag(gb, flag))
         {
             if ((offset & 0x80) > 0)
@@ -2060,15 +1443,11 @@ bool DoInstruction(GB *gb)
             // printf("didn't jump\n");
         }
     }
-    break;
 
-    case OP_JR_dd:
+    instr(opcode, 0x18, "jr dd")
     {
         uint8_t offset = FetchByte(gb);
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, JR PC+$%01X\n", instrPC, (uint8_t)offset);
-#endif
         if ((offset & 0x80) > 0)
         {
             offset = ~offset;
@@ -2081,31 +1460,19 @@ bool DoInstruction(GB *gb)
             gb->regs[REG_PC] += offset;
         }
     }
-    break;
 
-    case OP_CALL_nn:
+    instr(opcode, 0xCD, "call nn")
     {
         uint16_t addr = FetchWord(gb);
         Push16(gb, gb->regs[REG_PC]);
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, CALL $%02X - (return to $%02X)\n", instrPC, addr, gb->regs[REG_PC]);
-#endif
         gb->regs[REG_PC] = addr;
     }
-    break;
 
-    case OP_CALL_NZ_nn:
-    case OP_CALL_Z_nn:
-    case OP_CALL_NC_nn:
-    case OP_CALL_C_nn:
+    instr_left_r(opcode, 0xC4, 3, "call f,nn")
     {
         uint8_t flag = opcode >> 3 & 0b111;
         uint16_t addr = FetchWord(gb);
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, CALL %s,$%02X\n", instrPC, GetFlagName(flag), addr);
-#endif
 
         if (CheckFlag(gb, flag))
         {
@@ -2115,74 +1482,42 @@ bool DoInstruction(GB *gb)
             gb->regs[REG_PC] = addr;
         }
     }
-    break;
 
-    case OP_RET:
+    instr(opcode, 0xC9, "ret")
     {
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RET\n", instrPC);
-#endif
-
         gb->regs[REG_PC] = Pop16(gb);
     }
-    break;
 
-    case OP_RET_NZ_nn:
-    case OP_RET_Z_nn:
-    case OP_RET_NC_nn:
-    case OP_RET_C_nn:
+    instr_left_r(opcode, 0xC0, 3, "ret f,nn")
     {
         uint8_t flag = opcode >> 3 & 0b111;
-
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RET %s\n", instrPC, GetFlagName(flag));
-#endif
 
         if (CheckFlag(gb, flag))
         {
             gb->regs[REG_PC] = Pop16(gb);
         }
     }
-    break;
 
-    case OP_RETI:
+    instr(opcode, 0xD9, "reti")
     {
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RETI\n", instrPC);
-#endif
-
         gb->regs[REG_PC] = Pop16(gb);
         gb->IME = true;
     }
-    break;
 
-    case OP_RST_00:
-    case OP_RST_08:
-    case OP_RST_10:
-    case OP_RST_18:
-    case OP_RST_20:
-    case OP_RST_28:
-    case OP_RST_30:
-    case OP_RST_38:
+    instr_rst(opcode, "rst n")
     {
         uint8_t val = (FetchByte(gb) >> 3) & 0b111;
         Push16(gb, gb->regs[REG_PC]);
 
-#ifdef _DBG_INSTR_
-        printf("PC: 0x%02X, RST $%01X - (return to $%02X)\n", instrPC, val, gb->regs[REG_PC]);
-#endif
         gb->regs[REG_PC] = val;
     }
-    break;
 
-    default:
+    instr_invalid()
     {
         DumpCPURegisters(gb);
         printf("PC: $%02X: Unknown instruction: 0x%01X\n", instrPC, opcode);
         return false;
     }
-    }
-
     return true;
 }
 
@@ -2230,8 +1565,8 @@ void StartGB(GB *gb)
     gb->regs[REG_AF] = 0x0000;
 
     // TODO: Run boot up procedure instead of jumping to cartridge immediately
-    gb->regs[REG_PC] = 0x100;
-    gb->IME = false;
+    gb->regs[REG_PC] = 0x0;
+    gb->IME = true;
     gb->halted = false;
 
     memset(gb->mem, 0x00, sizeof(uint8_t) * 0x8000);
@@ -2339,5 +1674,5 @@ void StartGB(GB *gb)
     }
 
     SimpleRender(gb, gb->ctx);
-    // DumpCPURegisters(gb);
+    DumpCPURegisters(gb);
 }
